@@ -5,6 +5,7 @@ from copy import deepcopy
 import pytest
 from decaylanguage import DecayChain, DecayMode
 from numpy.testing import assert_almost_equal
+
 from phasespace.fromdecay import GenMultiDecay
 from phasespace.fromdecay.mass_functions import DEFAULT_CONVERTER
 
@@ -28,9 +29,7 @@ def check_norm(full_decay: GenMultiDecay, **kwargs) -> list[tuple]:
         assert len(return_args) == 2 if norm else 3
         assert sum(len(w) for w in return_args[0]) == kwargs["n_events"]
         if not norm:
-            assert all(
-                len(w) == len(mw) for w, mw in zip(return_args[0], return_args[1])
-            )
+            assert all(len(w) == len(mw) for w, mw in zip(return_args[0], return_args[1]))
 
         all_return_args.append(return_args)
 
@@ -62,9 +61,7 @@ def test_single_chain():
     Since dplus_single is constructed using DecayChain.to_dict, this also tests that the code works dicts
     created from DecayChains, not just .dec files.
     """
-    container = GenMultiDecay.from_dict(
-        example_decay_chains.dplus_single, tolerance=1e-10
-    )
+    container = GenMultiDecay.from_dict(example_decay_chains.dplus_single, tolerance=1e-10)
     output_decay = container.gen_particles
     assert len(output_decay) == 1
     prob, gen = output_decay[0]
@@ -88,9 +85,7 @@ def test_single_chain():
 
 def test_branching_children():
     """Test converting a DecayLanguage dict where the mother particle can decay in many ways."""
-    container = GenMultiDecay.from_dict(
-        example_decay_chains.pi0_4branches, tolerance=1e-10
-    )
+    container = GenMultiDecay.from_dict(example_decay_chains.pi0_4branches, tolerance=1e-10)
     output_decays = container.gen_particles
     assert len(output_decays) == 4
     assert_almost_equal(sum(d[0] for d in output_decays), 1)
@@ -104,9 +99,7 @@ def test_branching_grandchilden():
     decay_dict = deepcopy(example_decay_chains.dplus_4grandbranches)
 
     # Add different zfit parameters to all pi0 decays. The fourth decay has no zfit parameter
-    for mass_function, decay_mode in zip(
-        ("relbw", "bw", "gauss"), decay_dict["D+"][0]["fs"][-1]["pi0"]
-    ):
+    for mass_function, decay_mode in zip(("relbw", "bw", "gauss"), decay_dict["D+"][0]["fs"][-1]["pi0"]):
         decay_mode["zfit"] = mass_function
 
     container = GenMultiDecay.from_dict(decay_dict, tolerance=1e-10)
@@ -115,9 +108,7 @@ def test_branching_grandchilden():
     assert len(output_decays) == 4
     assert_almost_equal(sum(d[0] for d in output_decays), 1)
 
-    for p, mass_func in zip(
-        output_decays, ("relbw", "bw", "gauss", GenMultiDecay.DEFAULT_MASS_FUNC)
-    ):
+    for p, mass_func in zip(output_decays, ("relbw", "bw", "gauss", GenMultiDecay.DEFAULT_MASS_FUNC)):
         gen_particle = p[1]  # Ignore probability
         assert gen_particle.children[-1].name == "pi0"
         # Check that the zfit parameter assigns the correct mass function
@@ -181,9 +172,7 @@ def test_big_decay():
 def test_mass_width_tolerance():
     """Test changing the MASS_WIDTH_TOLERANCE class variable."""
     GenMultiDecay.MASS_WIDTH_TOLERANCE = 1e-10
-    output_decays = GenMultiDecay.from_dict(
-        example_decay_chains.dplus_4grandbranches
-    ).gen_particles
+    output_decays = GenMultiDecay.from_dict(example_decay_chains.dplus_4grandbranches).gen_particles
     for p in output_decays:
         gen_particle = p[1]  # Ignore probability
         assert gen_particle.children[-1].name[:3] == "pi0"
@@ -196,9 +185,7 @@ def test_mass_width_tolerance():
 def test_default_mass_func():
     """Test changing the DEFAULT_MASS_FUNC class variable."""
     GenMultiDecay.DEFAULT_MASS_FUNC = "bw"
-    output_decays = GenMultiDecay.from_dict(
-        example_decay_chains.dplus_4grandbranches, tolerance=1e-10
-    ).gen_particles
+    output_decays = GenMultiDecay.from_dict(example_decay_chains.dplus_4grandbranches, tolerance=1e-10).gen_particles
     for p in output_decays:
         gen_particle = p[1]  # Ignore probability
         assert gen_particle.children[-1].name[:3] == "pi0"
