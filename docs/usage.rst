@@ -117,12 +117,13 @@ Resonances with variable mass
 
 
 To generate the mass of a resonance, we need to give a function as its mass instead of a floating number.
-This function should take as input the per-event lower mass allowed, per-event upper mass allowed and the number of
-events, and should return an array-like object with the generated masses and shape (nevents,). Well suited for this task
-are the `TensorFlow Probability distributions <https://www.tensorflow.org/probability/api_docs/python/tfp/distributions>`_
-or, for more customized mass shapes, the
-`zfit pdfs <https://zfit.github.io/zfit/model.html#tensor-sampling>`_ (currently an
-*experimental feature* is needed, contact the `zfit developers <https://github.com/zfit/zfit>`_ to learn more).
+This function is called as ``mass(min_mass, max_mass, n_events, key)``: the per-event lower mass allowed,
+the per-event upper mass allowed, the number of events and a JAX PRNG key. It should return an array-like
+object with the generated masses and shape (nevents,), and has to be jit-compatible, i.e. written with
+`jax.numpy <https://docs.jax.dev/en/latest/jax.numpy.html>`_ and
+`jax.random <https://docs.jax.dev/en/latest/jax.random.html>`_.
+Ready-made mass shapes for resonances (Gaussian, Breit-Wigner and relativistic Breit-Wigner) are available in
+:py:mod:`phasespace.fromdecay.mass_functions`.
 
 Following with the same example as above, and approximating the resonance shape by a gaussian, we could
 write the :math:`B^{0}\to K^{*}\gamma` decay chain as (more details can be found in ``tests/helpers/decays.py``):
@@ -130,26 +131,22 @@ write the :math:`B^{0}\to K^{*}\gamma` decay chain as (more details can be found
 .. jupyter-execute::
     :hide-output:
 
-    from phasespace import numpy as tnp
-    import tensorflow_probability as tfp
+    import jax
+    from phasespace import numpy as jnp
     from phasespace import GenParticle
 
     KSTARZ_MASS = 895.81
     KSTARZ_WIDTH = 47.4
 
-    def kstar_mass(min_mass, max_mass, n_events):
-       min_mass = tnp.asarray(min_mass, tnp.float64)
-       max_mass = tnp.asarray(max_mass, tnp.float64)
-       kstar_width_cast = tnp.asarray(KSTARZ_WIDTH, tnp.float64)
-       kstar_mass_cast = tnp.asarray(KSTARZ_MASS, tnp.float64)
-
-       kstar_mass = tnp.broadcast_to(kstar_mass_cast, shape=(n_events,))
-       if KSTARZ_WIDTH > 0:
-           kstar_mass = tfp.distributions.TruncatedNormal(loc=kstar_mass,
-                                                          scale=kstar_width_cast,
-                                                          low=min_mass,
-                                                          high=max_mass).sample()
-       return kstar_mass
+    def kstar_mass(min_mass, max_mass, n_events, key):
+       # a normal distribution truncated to the kinematically allowed range: jax samples the
+       # standard normal within the standardized bounds, which is then scaled back
+       standard = jax.random.truncated_normal(key,
+                                              lower=(min_mass - KSTARZ_MASS) / KSTARZ_WIDTH,
+                                              upper=(max_mass - KSTARZ_MASS) / KSTARZ_WIDTH,
+                                              shape=(n_events,),
+                                              dtype=jnp.float64)
+       return KSTARZ_MASS + KSTARZ_WIDTH * standard
 
     bz = GenParticle('B0', B0_MASS).set_children(GenParticle('K*0', mass=kstar_mass)
                                                 .set_children(GenParticle('K+', mass=KAON_MASS),
@@ -192,22 +189,37 @@ In this example, ``decay`` is simply a ``GenParticle`` with the corresponding ch
 Eager execution
 ---------------
 
-By default, `phasespace` uses JIT (*just-in-time*) compilation of TensorFlow to greatly speed up the generation of events. Simplified, this means that the first time a decay is generated, a symbolic array *without a concrete value* is used and the computation is remembered. As a user calling the function, you will not notice this, the output will be the same as if the function was executed eagerly.
-The consequence is two-fold: on one hand the initial overhead is higher with a significant speedup for subsequent generations, on the other hand, the values of the generated particles *inside the function* are not available in pure Python (e.g. for debugging basically).
+By default, `phasespace` uses JIT (*just-in-time*) compilation with :py:func:`jax.jit` to greatly speed up the
+generation of events. Simplified, this means that the first time a decay is generated, a symbolic array
+*without a concrete value* is used and the computation is compiled. As a user calling the function, you will
+not notice this, the output will be the same as if the function was executed eagerly.
+The consequence is two-fold: on one hand the initial overhead is higher with a significant speedup for
+subsequent generations, on the other hand, the values of the generated particles *inside the function* are not
+available in pure Python (e.g. for debugging basically).
 
-If you need to debug the internals, using ``tf.config.run_functions_eagerly(True)`` (or the environment variable ``"PHASESPACE_EAGER=1"``) will make everything run numpy-like.
+The number of events is a *static* argument of the compiled function: generating with a new ``n_events``
+recompiles, while repeated calls with the same value reuse the compiled function. Prefer therefore to
+generate repeatedly with the same number of events.
+
+If you need to debug the internals, using :py:func:`jax.disable_jit` (or the environment variable
+``"PHASESPACE_EAGER=1"``) will make everything run numpy-like.
+
+Double precision
+----------------
+
+Importing `phasespace` enables the double precision mode of JAX, which is off by default, via
+``jax.config.update("jax_enable_x64", True)``. This is a process-wide setting and required for correctness:
+the phase space computation is not numerically stable in single precision.
 
 Random numbers
 --------------
 
-The random number generation inside `phasespace` is transparent in order to allow for deterministic
-behavior if desired. A function that uses random number generation inside always takes a `seed` (or `rng`)
-argument. The behavior is as follows
+Random number generation in JAX is purely functional: rather than relying on a global generator state,
+an explicit key is threaded through the computation. Every function that generates random numbers therefore
+takes a ``key`` argument, which can be
 
-- if no seed is given, the global random number generator of TensorFlow will be used. Setting this
-  instance explicitly or by setting the seed via `tf.random.set_seed` allows for a deterministic
-  execution of a whole _script_.
-- if the seed is a number it will be used to create a random number generator from this. Using the
-  same seed again will result in the same output.
-- if the seed is an instance of :py:class:`tf.random.Generator`, this instance will directly be used
-  and advances an undefined number of steps.
+- ``None``, in which case a new key is created from OS entropy. The generation is then not reproducible.
+- a number, which is used to create a key. Using the same number again results in the same output.
+- a JAX PRNG key as created by :py:func:`jax.random.key`, which is used directly.
+
+Note that, unlike a stateful generator, passing the *same* key twice returns exactly the same events.

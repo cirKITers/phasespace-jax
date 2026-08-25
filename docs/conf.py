@@ -18,32 +18,12 @@
 # absolute, like shown here.
 #
 
-import os
 import warnings
-
-# Suppress TensorFlow and zfit warnings during documentation build
-os.environ["ZFIT_DISABLE_TF_WARNINGS"] = "1"
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 # Suppress all Python warnings during documentation build
 warnings.filterwarnings("ignore")
 
-# Suppress TensorFlow C++ logging to stderr
-import logging  # noqa: E402
-
-logging.getLogger("tensorflow").setLevel(logging.ERROR)
-
-# Try to suppress absl logging
-try:
-    from absl import logging as absl_logging
-
-    absl_logging.set_verbosity(absl_logging.ERROR)
-    absl_logging.set_stderrthreshold(absl_logging.ERROR)
-except ImportError:
-    pass
-
-import phasespace  # noqa: E402
+import phasespace
 
 # -- General configuration ---------------------------------------------
 
@@ -101,7 +81,7 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = "TensorFlow PhaseSpace"
+project = "PhaseSpace"
 copyright = "2024, Albert Puig Navarro"
 author = "Albert Puig Navarro"
 
@@ -179,7 +159,7 @@ html_theme_options = {
     "icon_links": [
         {
             "name": "GitHub",
-            "url": "https://github.com/zfit/phasespace",
+            "url": "https://github.com/stroblme/phasespace-jax",
             "icon": "fa-brands fa-github",
             "type": "fontawesome",
         },
@@ -230,7 +210,7 @@ latex_documents = [
     (
         master_doc,
         "phasespace.tex",
-        "TensorFlow PhaseSpace Documentation",
+        "PhaseSpace Documentation",
         "Albert Puig Navarro",
         "manual",
     ),
@@ -240,9 +220,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    (master_doc, "phasespace", "TensorFlow PhaseSpace Documentation", [author], 1)
-]
+man_pages = [(master_doc, "phasespace", "PhaseSpace Documentation", [author], 1)]
 
 # -- Options for Texinfo output ----------------------------------------
 
@@ -253,7 +231,7 @@ texinfo_documents = [
     (
         master_doc,
         "phasespace",
-        "TensorFlow PhaseSpace Documentation",
+        "PhaseSpace Documentation",
         author,
         "phasespace",
         "One line description of project.",

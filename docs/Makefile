@@ -8,8 +8,8 @@ SPHINXPROJ    = phasespace
 SOURCEDIR     = .
 BUILDDIR      = _build
 
-# Filter out TensorFlow/absl stderr warnings
-FILTER_WARNINGS = 2>&1 | grep -v "All log messages before absl" | grep -v "Could not find cuda" | grep -v "cuFFT\|cuDNN\|cuBLAS\|computation placer" || true
+# Filter out backend stderr warnings (e.g. missing CUDA on CPU-only machines)
+FILTER_WARNINGS = 2>&1 | grep -v "All log messages before absl" | grep -v "Could not find cuda" | grep -v "cuFFT\|cuDNN\|cuBLAS\|computation placer\|An NVIDIA GPU may be present" || true
 
 # Put it first so that "make" without argument is like "make help".
 help:
