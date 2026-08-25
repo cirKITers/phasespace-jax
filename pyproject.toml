@@ -3,10 +3,10 @@ requires = ["hatchling>=1.17.1", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "phasespace"
-description = "TensorFlow implementation of the Raubold and Lynch method for n-body events"
+name = "phasespace-jax"
+description = "JAX implementation of the Raubold and Lynch method for n-body events"
 authors = [{ name = "Albert Puig Navarro", email = "apuignav@gmail.com" }]
-maintainers = [{ name = "zfit", email = "zfit@physik.uzh.ch" }]
+maintainers = [{ name = "Melvin Strobl", email = "stroblme@posteo.de" }]
 license = { text = "BSD-3-Clause" }
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -23,39 +23,30 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Physics",
 ]
-keywords = ["TensorFlow", "phasespace", "HEP"]
-urls = { Homepage = "https://github.com/zfit/phasespace" }
+keywords = ["JAX", "phasespace", "HEP"]
+urls = { Homepage = "https://github.com/stroblme/phasespace-jax" }
 requires-python = ">=3.10"
 dependencies = [
-    "tensorflow>=2.19.0",
-    "tensorflow_probability>=0.25.0",
+    "jax>=0.4.35",
 ]
 dynamic = ["version"]
 
 [project.readme]
-file = "README.rst"
-content-type = "text/x-rst"
+file = "README.md"
+content-type = "text/markdown"
 
 [project.optional-dependencies]
-tf = [
-    "tensorflow >=2.19.0", # TODO(2.0): make this the only requirement, add versions, remove from install_requires
-    "tensorflow_probability >=0.25.0",
-]
-tensorflow = ["phasespace[tf]"]
 fromdecay = [
     "particle >= 0.25.0",
-    "zfit >=0.12.0",
-    "zfit-physics >= 0.6",
     "decaylanguage >= 0.19.0", # not required but everyone using this feature will likely use DecayLanguage
 ]
 vector = ["vector >= 1.5.2"]
 all = [
-    "phasespace[fromdecay]",
-    "phasespace[vector]",
-    "phasespace[tf]",
+    "phasespace-jax[fromdecay]",
+    "phasespace-jax[vector]",
 ]
 test = [
-    "phasespace[all]",
+    "phasespace-jax[all]",
     "awkward>=2.7",
     "coverage",
     "flaky",
@@ -70,8 +61,8 @@ test = [
     "wget",
 ]
 doc = [
-    "phasespace[fromdecay]",
-    "phasespace[vector]",
+    "phasespace-jax[fromdecay]",
+    "phasespace-jax[vector]",
     "graphviz",
     "Sphinx",
     "myst-nb",
@@ -80,12 +71,12 @@ doc = [
     "sphinx-math-dollar",
 ]
 dev = [
-    "phasespace[doc]",
-    "phasespace[test]",
-    "bumpversion",
+    "phasespace-jax[doc]",
+    "phasespace-jax[test]",
     "pre-commit",
+    "ruff",
+    "ty",
     "twine",
-    "watchdog",
 ]
 
 [tool.hatch]
@@ -93,21 +84,27 @@ version.source = "vcs"
 build.hooks.vcs.version-file = "src/phasespace/_version.py"
 metadata.allow-direct-references = true
 
-[tool.distutils.bdist_wheel]
-universal = 1
+# the distribution is named phasespace-jax, the import package stays phasespace
+[tool.hatch.build.targets.wheel]
+packages = ["src/phasespace"]
 
-[tool.flake8]
-exclude = """
-benchmark,
-data,
-dist,
-docs,
-paper,
-scripts,
-utils"""
-max-line-length = "120"
-statistics = "True"
-max-complexity = "30"
+[tool.ruff]
+line-length = 120
+extend-exclude = ["data", "paper", "scripts"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B", "C4", "RUF"]
+ignore = [
+    "RUF001", "RUF002", "RUF003", # ambiguous unicode in physics docstrings
+    "B905", # zip(..., strict=) would change behaviour of existing code
+]
+
+[tool.ruff.lint.per-file-ignores]
+"docs/conf.py" = ["E402"]
+"tests/test_physics.py" = ["E402"] # matplotlib backend has to be set before importing pyplot
+
+[tool.ty.rules]
+unresolved-import = "ignore"  # optional extras (vector, particle, decaylanguage)
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
@@ -125,8 +122,3 @@ addopts = """
 --ignore=setup.py"""
 filterwarnings = ["ignore:.*the imp module is deprecated in favour of importlib.*:DeprecationWarning"]
 norecursedirs = ["tests/helpers"]
-
-
-[tool.isort]
-profile = "black"
-src_paths = ["phasespace", "tests"]
