@@ -18,19 +18,19 @@ def _is_silent():
 FILE_URLS = [
     (
         "B2K1Gamma_RapidSim_7TeV_K1KstarNonResonant_Tree.root",
-        "https://cernbox.cern.ch/remote.php/dav/public-files/8mN10X8U7VGfaRc/B2K1Gamma_RapidSim_7TeV_K1KstarNonResonant_Tree.root",  # noqa: E501
+        "https://cernbox.cern.ch/remote.php/dav/public-files/8mN10X8U7VGfaRc/B2K1Gamma_RapidSim_7TeV_K1KstarNonResonant_Tree.root",
     ),
     (
         "B2K1Gamma_RapidSim_7TeV_Tree.root",
-        "https://cernbox.cern.ch/remote.php/dav/public-files/pr3aM8n2hPT4Pag/B2K1Gamma_RapidSim_7TeV_Tree.root",  # noqa: E501
+        "https://cernbox.cern.ch/remote.php/dav/public-files/pr3aM8n2hPT4Pag/B2K1Gamma_RapidSim_7TeV_Tree.root",
     ),
     (
         "B2KstGamma_RapidSim_7TeV_KstarNonResonant_Tree.root",
-        "https://cernbox.cern.ch/remote.php/dav/public-files/QuP2cHeISTTSLVv/B2KstGamma_RapidSim_7TeV_KstarNonResonant_Tree.root",  # noqa: E501
+        "https://cernbox.cern.ch/remote.php/dav/public-files/QuP2cHeISTTSLVv/B2KstGamma_RapidSim_7TeV_KstarNonResonant_Tree.root",
     ),
     (
         "B2KstGamma_RapidSim_7TeV_Tree.root",
-        "https://cernbox.cern.ch/remote.php/dav/public-files/EH5yrCpGko7P7Mc/B2KstGamma_RapidSim_7TeV_Tree.root",  # noqa: E501
+        "https://cernbox.cern.ch/remote.php/dav/public-files/EH5yrCpGko7P7Mc/B2KstGamma_RapidSim_7TeV_Tree.root",
     ),
 ]
 
@@ -79,9 +79,7 @@ class DownloadProgressTracker:
             total_downloaded_mb = int(total_downloaded / 1e6)
             total_size_mb = int(total_size / 1e6)
             percentage = (total_downloaded / total_size) * 100
-            bytes_status = (
-                f"{total_downloaded_mb:,}MB / {total_size_mb:,}MB ({percentage:.1f}%)"
-            )
+            bytes_status = f"{total_downloaded_mb:,}MB / {total_size_mb:,}MB ({percentage:.1f}%)"
         else:
             bytes_status = "Initializing..."
 
@@ -140,9 +138,7 @@ def download_all_parallel(max_workers=None):
     makedirs(output_dir, exist_ok=True)
 
     if not _is_silent():
-        print(
-            f"Downloading {len(FILE_URLS)} files with {max_workers} parallel workers...\n"
-        )
+        print(f"Downloading {len(FILE_URLS)} files with {max_workers} parallel workers...\n")
 
     # Create progress tracker
     progress_tracker = DownloadProgressTracker(len(FILE_URLS))
@@ -151,8 +147,7 @@ def download_all_parallel(max_workers=None):
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all download tasks
         future_to_file = {
-            executor.submit(download_file, filename, url, progress_tracker): filename
-            for filename, url in FILE_URLS
+            executor.submit(download_file, filename, url, progress_tracker): filename for filename, url in FILE_URLS
         }
 
         # Process completed downloads as they finish
