@@ -1,0 +1,76 @@
+site_name: phasespace-jax
+site_url: https://stroblme.github.io/phasespace-jax/
+site_description: JAX implementation of the Raubold and Lynch method for n-body events
+repo_url: https://github.com/stroblme/phasespace-jax
+repo_name: stroblme/phasespace-jax
+
+nav:
+  - Home: index.md
+  - Usage: usage.md
+  - DecayChain tutorial: GenMultiDecay_Tutorial.md
+  - API: api.md
+  - Changelog: changelog.md
+  - Authors: authors.md
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - content.code.select
+    - navigation.top
+    - navigation.tracking
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_source: false
+            members_order: source
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - toc:
+      permalink: "#"
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: ["."]
+  - pymdownx.superfences
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/stroblme/phasespace-jax
+      name: phasespace-jax on GitHub
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
