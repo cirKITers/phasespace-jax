@@ -17,6 +17,10 @@
 
 ::: phasespace.random
 
+## phasespace.precision
+
+::: phasespace.precision
+
 ## phasespace.fromdecay
 
 ::: phasespace.fromdecay.genmultidecay

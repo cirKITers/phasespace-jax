@@ -191,9 +191,20 @@ If you need to debug the internals, using `jax.disable_jit` (or the environment 
 
 ## Double precision
 
-Importing `phasespace` enables the double precision mode of JAX, which is off by default, via
-`jax.config.update("jax_enable_x64", True)`. This is a process-wide setting and required for
-correctness: the phase space computation is not numerically stable in single precision.
+The phase space computation is not numerically stable in single precision: `pdk` suffers
+catastrophic cancellation close to threshold, which degrades energy-momentum conservation from
+~1e-15 to ~1e-6 relative. `generate` therefore enables the double precision mode of JAX, which is
+off by default, for the duration of the call and always returns `float64` arrays. Importing
+`phasespace` does not change any global JAX setting.
+
+JAX only keeps 64-bit values while x64 mode is on, so if your program leaves it off, further *JAX*
+operations on the returned arrays downcast them to `float32` and warn. Converting to numpy with
+`np.asarray` preserves the full precision; if you keep computing in JAX, enable the mode for your
+program with `jax.config.update("jax_enable_x64", True)`.
+
+The helpers in [`phasespace.kinematics`][phasespace.kinematics] deliberately follow the precision
+of their caller instead of forcing their own, so that they stay composable with `jax.jit`. Use them
+under x64.
 
 ## Random numbers
 
