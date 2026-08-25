@@ -27,7 +27,7 @@ keywords = ["JAX", "phasespace", "HEP"]
 urls = { Homepage = "https://stroblme.github.io/phasespace-jax/", Repository = "https://github.com/stroblme/phasespace-jax", Documentation = "https://stroblme.github.io/phasespace-jax/", Changelog = "https://stroblme.github.io/phasespace-jax/changelog/" }
 requires-python = ">=3.10"
 dependencies = [
-    "jax>=0.4.35",
+    "jax>=0.8.0"
 ]
 dynamic = ["version"]
 
