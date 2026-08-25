@@ -46,11 +46,13 @@ def ref_mass_func(min_mass, max_mass, n_events, key):
 @pytest.mark.parametrize("size", (1, 10))
 def test_shape(function: Callable, size: int, params: tuple = (1.0, 1.0)):
     key = jax.random.key(1234)
-    min_max_mass = jax.random.uniform(key, minval=0, maxval=1000, shape=(2, size), dtype=jnp.float64)
-    min_mass, max_mass = jnp.sort(min_max_mass, axis=0)
-    assert jnp.all(min_mass <= max_mass)
-    ref_sample = ref_mass_func(min_mass, max_mass, len(min_mass), key)
-    sample = function(*params)(min_mass, max_mass, len(min_mass), key)
+    # the samplers follow the precision of their caller, which is `generate` in normal use
+    with jax.enable_x64():
+        min_max_mass = jax.random.uniform(key, minval=0, maxval=1000, shape=(2, size), dtype=jnp.float64)
+        min_mass, max_mass = jnp.sort(min_max_mass, axis=0)
+        assert jnp.all(min_mass <= max_mass)
+        ref_sample = ref_mass_func(min_mass, max_mass, len(min_mass), key)
+        sample = function(*params)(min_mass, max_mass, len(min_mass), key)
     assert sample.shape == ref_sample.shape
 
 
@@ -61,11 +63,12 @@ def test_shape(function: Callable, size: int, params: tuple = (1.0, 1.0)):
 def test_within_limits(function: Callable):
     """The sampled masses have to respect the per-event kinematic limits."""
     n_events = 500
-    min_mass = jnp.full((n_events,), 600.0, dtype=jnp.float64)
-    max_mass = jnp.full((n_events,), 1200.0, dtype=jnp.float64)
-    sample = function(KSTARZ_MASS, KSTARZ_WIDTH)(min_mass, max_mass, n_events, jax.random.key(4))
-    assert jnp.all(sample >= min_mass)
-    assert jnp.all(sample <= max_mass)
+    with jax.enable_x64():
+        min_mass = jnp.full((n_events,), 600.0, dtype=jnp.float64)
+        max_mass = jnp.full((n_events,), 1200.0, dtype=jnp.float64)
+        sample = function(KSTARZ_MASS, KSTARZ_WIDTH)(min_mass, max_mass, n_events, jax.random.key(4))
+        assert jnp.all(sample >= min_mass)
+        assert jnp.all(sample <= max_mass)
 
 
 @pytest.mark.parametrize(
@@ -73,14 +76,19 @@ def test_within_limits(function: Callable):
     (mf.gauss_factory, mf.breitwigner_factory, mf.relativistic_breitwigner_factory),
 )
 def test_jit(function: Callable):
-    """The mass functions run inside jitted generation, so they have to be traceable."""
+    """The mass functions run inside jitted generation, so they have to be traceable.
+
+    They are deliberately transparent to the precision mode, which ``generate`` establishes
+    around them, so the double precision context is entered here as well.
+    """
     n_events = 100
-    mass_func = function(KSTARZ_MASS, KSTARZ_WIDTH)
-    jitted = jax.jit(lambda lo, hi, key: mass_func(lo, hi, n_events, key))
-    sample = jitted(
-        jnp.full((n_events,), 600.0, dtype=jnp.float64),
-        jnp.full((n_events,), 1200.0, dtype=jnp.float64),
-        jax.random.key(0),
-    )
+    with jax.enable_x64():
+        mass_func = function(KSTARZ_MASS, KSTARZ_WIDTH)
+        jitted = jax.jit(lambda lo, hi, key: mass_func(lo, hi, n_events, key))
+        sample = jitted(
+            jnp.full((n_events,), 600.0, dtype=jnp.float64),
+            jnp.full((n_events,), 1200.0, dtype=jnp.float64),
+            jax.random.key(0),
+        )
     assert sample.shape == (n_events,)
     assert sample.dtype == jnp.float64

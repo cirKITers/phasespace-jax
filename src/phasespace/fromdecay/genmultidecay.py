@@ -10,6 +10,7 @@ import numpy as np
 from particle import Particle
 
 from phasespace import GenParticle
+from phasespace.precision import with_float64
 from phasespace.random import KeyLike, ensure_key
 
 from .mass_functions import DEFAULT_CONVERTER
@@ -155,6 +156,7 @@ class GenMultiDecay:
         )
         return cls(gen_particles)
 
+    @with_float64
     def generate(
         self, n_events: int, normalize_weights: bool = True, key: KeyLike = None, **kwargs
     ) -> tuple[list[jax.Array], list[jax.Array]] | tuple[list[jax.Array], list[jax.Array], list[jax.Array]]:
@@ -193,7 +195,7 @@ class GenMultiDecay:
         for i, n in enumerate(counts):
             if n == 0:
                 continue
-            weight, max_weight, four_vectors = self.gen_particles[i][1].generate(  # ty: ignore[invalid-assignment]
+            weight, max_weight, four_vectors = self.gen_particles[i][1].generate(
                 int(n), normalize_weights=False, key=keys[i], **kwargs
             )
             weights.append(weight)

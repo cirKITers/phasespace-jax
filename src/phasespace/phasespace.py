@@ -23,6 +23,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from . import kinematics as kin
+from .precision import with_float64
 from .random import KeyLike, ensure_key
 
 if TYPE_CHECKING:
@@ -92,6 +93,7 @@ class GenParticle:
             ``mass(min_mass, max_mass, n_events, key)`` and has to be jit-compatible.
     """
 
+    @with_float64
     def __init__(self, name: str, mass: Callable | int | float | np.typing.ArrayLike) -> None:
         self.name = name
         self.children = []
@@ -133,6 +135,7 @@ class GenParticle:
             return dup_names
         return None
 
+    @with_float64
     def get_mass(
         self,
         min_mass: jax.Array | None = None,
@@ -545,6 +548,7 @@ class GenParticle:
             weights_max = jnp.reshape(recurse_w_max(kin.mass(momentum), mass_tree[self.name]), (n_events,))
         return weights, weights_max, output_particles, output_masses, allowed
 
+    @with_float64
     def generate(
         self,
         n_events: int,

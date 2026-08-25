@@ -114,8 +114,7 @@ def relativistic_breitwigner_factory(mass, width):
     density = 1.0 / ((grid_mass**2 - particle_mass**2) ** 2 + particle_mass**2 * particle_width**2)
     grid_cdf = np.concatenate([[0.0], np.cumsum(0.5 * (density[1:] + density[:-1]) * np.diff(grid_mass))])
     grid_cdf /= grid_cdf[-1]
-    grid_mass = jnp.asarray(grid_mass, dtype=jnp.float64)
-    grid_cdf = jnp.asarray(grid_cdf, dtype=jnp.float64)
+    # kept as numpy: converting here would pin the dtype outside the caller's float64 scope
 
     def relbw(min_mass, max_mass, n_events, key):
         uniform = jax.random.uniform(key, (n_events,), dtype=jnp.float64)
