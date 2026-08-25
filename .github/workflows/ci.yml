@@ -27,31 +27,31 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
       - name: Ruff lint
-        run: uvx ruff check src tests benchmark docs/conf.py data
+        run: uvx ruff check src tests benchmark data
       - name: Ruff format
-        run: uvx ruff format --check src tests benchmark docs/conf.py data
+        run: uvx ruff format --check src tests benchmark data
       - name: Type check
         run: uvx ty check src
 
   download-data:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Cache test data
         id: cache-data
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: data/large
           key: test-data-${{ hashFiles('data/download_test_files.py') }}
       - name: Set up Python
         if: steps.cache-data.outputs.cache-hit != 'true'
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.10'
       - name: Install wget
@@ -75,18 +75,18 @@ jobs:
       matrix:
         python-version: ["3.10"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Download test data
         uses: actions/download-artifact@v8
         with:
           name: test-data
           path: data/large
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
       - name: Install dependencies
@@ -97,7 +97,7 @@ jobs:
         run: PYTHONPATH=src coverage run -m pytest
       - name: Create XML report
         run: coverage xml
-      - uses: codecov/codecov-action@v6.0.0
+      - uses: codecov/codecov-action@v7
         with:
           file: ./coverage.xml
 
@@ -119,22 +119,22 @@ jobs:
             python-version: '3.13'
             eager: 0
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Download test data
         uses: actions/download-artifact@v8
         with:
           name: test-data
           path: data/large
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
       - name: Get number of CPU cores
-        uses: SimenB/github-actions-cpu-cores@v2
+        uses: SimenB/github-actions-cpu-cores@v3
         id: cpu-cores
       - name: Install graphviz (Ubuntu)
         if: runner.os == 'Linux'
