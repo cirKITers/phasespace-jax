@@ -356,7 +356,7 @@ class GenParticle:
         random = jnp.concatenate(
             [
                 jnp.zeros((n_events, 1), dtype=jnp.float64),
-                jnp.sort(random_numbers, axis=1),
+                sort_rows(random_numbers, n_particles - 2),
                 jnp.ones((n_events, 1), dtype=jnp.float64),
             ],
             axis=1,
@@ -583,6 +583,45 @@ class GenParticle:
             weights_max = jnp.reshape(recurse_w_max(kin.mass(momentum), mass_tree[self.name]), (n_events,))
         return weights, weights_max, output_particles, output_masses, allowed
 
+    def _generate_chunked(self, n_events, chunk_size, boost_to, key):
+        """Generate ``n_events`` events in chunks of at most ``chunk_size`` and stitch them together.
+
+        Every chunk is a full ``generate`` call of its own, which keeps the input validation and the
+        forbidden-decay check in one place. Weights are left unnormalized here because the caller
+        normalizes the stitched result: ``weights_max`` is a per-event quantity, so normalizing per
+        chunk and concatenating would give the very same numbers.
+
+        Args:
+            n_events (int): Total number of events to generate.
+            chunk_size (int): Maximum number of events per chunk.
+            boost_to: Momentum vector to boost to, already preprocessed, or None.
+            key: JAX PRNG key, split once per chunk.
+
+        Returns:
+            tuple: The unnormalized event weights, the maximum per-event weights and the momenta of
+                the generated particles, each covering all ``n_events`` events.
+        """
+        sizes = [chunk_size] * (n_events // chunk_size)
+        if remainder := n_events % chunk_size:
+            sizes.append(remainder)
+        keys = jax.random.split(key, len(sizes))
+        weights, weights_max, parts = [], [], []
+        start = 0
+        for size, chunk_key in zip(sizes, keys):
+            chunk_boost = boost_to
+            if boost_to is not None and boost_to.shape[0] != 1:
+                chunk_boost = boost_to[start : start + size]
+            chunk = self.generate(size, boost_to=chunk_boost, normalize_weights=False, key=chunk_key)
+            weights.append(chunk[0])
+            weights_max.append(chunk[1])
+            parts.append(chunk[2])
+            start += size
+        return (
+            jnp.concatenate(weights),
+            jnp.concatenate(weights_max),
+            {name: jnp.concatenate([part[name] for part in parts]) for name in parts[0]},
+        )
+
     @with_float64
     def generate(
         self,
@@ -592,6 +631,7 @@ class GenParticle:
         key: KeyLike = None,
         *,
         as_vectors: bool | None = None,
+        chunk_size: int | None = None,
     ) -> tuple[jax.Array, dict[str, jax.Array]] | tuple[jax.Array, jax.Array, dict[str, jax.Array]]:
         """Generate normalized n-body phase space as JAX arrays.
 
@@ -604,6 +644,12 @@ class GenParticle:
             with a new value of ``n_events`` triggers a recompilation, while repeated calls with
             the same value reuse the compiled function.
 
+            Chunking changes which events are drawn, as every chunk consumes its own split of
+            ``key``: ``generate(n, key=k)`` and ``generate(n, key=k, chunk_size=c)`` give different
+            but equally valid samples, each of them reproducible. It bounds the memory of the
+            generation itself, not of the returned arrays, and keeps the number of compilations at
+            two (a full chunk and the remainder) whatever ``n_events`` is.
+
         Args:
             n_events (int): Number of events to generate.
             boost_to (optional): Momentum vector of shape ``(x, 4)``, where x is optional, to where
@@ -614,6 +660,9 @@ class GenParticle:
             key (``KeyLike``): Either an integer seed, a JAX PRNG key or None, in which case a
                 new key is created from OS entropy (and the generation is not reproducible).
             as_vectors (bool, optional): If True, the output momenta are returned as ``vector`` objects.
+            chunk_size (int, optional): Generate the events in chunks of at most this many rather
+                than all at once, which bounds the peak memory of the generation. Defaults to None,
+                which generates everything in one go.
 
         Returns:
             tuple: Result of the generation, which varies with the value of ``normalize_weights``:
@@ -628,11 +677,13 @@ class GenParticle:
                   ``(n_events, 4)`` with particle names as keys.
 
         Raises:
-            ValueError: If the decay is kinematically forbidden or if ``n_events`` and the size of
-                ``boost_to`` don't match.
+            ValueError: If the decay is kinematically forbidden, if ``n_events`` and the size of
+                ``boost_to`` don't match or if ``chunk_size`` is not positive.
         """
         key = ensure_key(key)
         n_events = int(n_events)
+        if chunk_size is not None and int(chunk_size) < 1:
+            raise ValueError(f"chunk_size has to be a positive number of events, not {chunk_size}.")
         if boost_to is not None:
             try:
                 import vector
@@ -662,19 +713,22 @@ class GenParticle:
                     f"The number of events requested ({n_events}) doesn't match the boost_to input size "
                     f"of {boost_to.shape}"
                 )
-        if self._jitted_recursive_generate is None:
-            self._jitted_recursive_generate = jax.jit(
-                self._recursive_generate,
-                static_argnames=("n_events", "recalculate_max_weights"),
+        if chunk_size is not None and int(chunk_size) < n_events:
+            weights, weights_max, parts = self._generate_chunked(n_events, int(chunk_size), boost_to, key)
+        else:
+            if self._jitted_recursive_generate is None:
+                self._jitted_recursive_generate = jax.jit(
+                    self._recursive_generate,
+                    static_argnames=("n_events", "recalculate_max_weights"),
+                )
+            weights, weights_max, parts, _, allowed = self._jitted_recursive_generate(
+                n_events=n_events,
+                boost_to=boost_to,
+                recalculate_max_weights=self.has_grandchildren,
+                key=key,
             )
-        weights, weights_max, parts, _, allowed = self._jitted_recursive_generate(
-            n_events=n_events,
-            boost_to=boost_to,
-            recalculate_max_weights=self.has_grandchildren,
-            key=key,
-        )
-        if not bool(allowed):
-            raise ValueError("Forbidden decay")
+            if not bool(allowed):
+                raise ValueError("Forbidden decay")
         parts = to_vectors(parts) if as_vectors else parts
         # `parts` holds vector.Momentum objects when as_vectors is set
         if normalize_weights:
