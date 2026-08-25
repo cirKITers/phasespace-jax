@@ -5,12 +5,12 @@ abstract: >-
   phase space generation algorithm (Raubold and Lynch, GENBOD) and the original
   implementation are the work of the phasespace authors; if you use this package in a
   scientific publication, please cite their paper as well (see references).
-repository-code: https://github.com/stroblme/phasespace-jax
+repository-code: https://github.com/cirKITers/phasespace-jax
 license: BSD-3-Clause
 authors:
   - given-names: Melvin
     family-names: Strobl
-    email: stroblme@posteo.de
+    email: melvin.strobl@kit.edu
 keywords:
   - Python
   - JAX

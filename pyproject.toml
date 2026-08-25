@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "phasespace-jax"
 description = "JAX implementation of the Raubold and Lynch method for n-body events"
 authors = [{ name = "Albert Puig Navarro", email = "apuignav@gmail.com" }]
-maintainers = [{ name = "Melvin Strobl", email = "stroblme@posteo.de" }]
+maintainers = [{ name = "Melvin Strobl", email = "melvin.strobl@kit.edu" }]
 license = { text = "BSD-3-Clause" }
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 keywords = ["JAX", "phasespace", "HEP"]
-urls = { Homepage = "https://stroblme.github.io/phasespace-jax/", Repository = "https://github.com/stroblme/phasespace-jax", Documentation = "https://stroblme.github.io/phasespace-jax/", Changelog = "https://stroblme.github.io/phasespace-jax/changelog/" }
+urls = { Homepage = "https://cirkiters.github.io/phasespace-jax/", Repository = "https://github.com/cirKITers/phasespace-jax", Documentation = "https://cirkiters.github.io/phasespace-jax/", Changelog = "https://cirkiters.github.io/phasespace-jax/changelog/" }
 requires-python = ">=3.10"
 dependencies = [
     "jax>=0.8.0"

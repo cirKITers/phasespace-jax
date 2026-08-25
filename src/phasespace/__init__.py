@@ -12,7 +12,7 @@ except PackageNotFoundError:
 
 __author__ = """Albert Puig Navarro"""
 __email__ = "apuignav@gmail.com"
-__maintainer__ = "Melvin Strobl <stroblme@posteo.de>"
+__maintainer__ = "Melvin Strobl <melvin.strobl@kit.edu>"
 
 __credits__ = [
     "Jonas Eschle <jonas.eschle@cern.ch>",

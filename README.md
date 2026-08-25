@@ -1,7 +1,7 @@
 # phasespace-jax
 
-[![tests](https://github.com/stroblme/phasespace-jax/actions/workflows/ci.yml/badge.svg)](https://github.com/stroblme/phasespace-jax/actions/workflows/ci.yml)
-[![docs](https://github.com/stroblme/phasespace-jax/actions/workflows/docs.yml/badge.svg)](https://stroblme.github.io/phasespace-jax/)
+[![tests](https://github.com/cirKITers/phasespace-jax/actions/workflows/ci.yml/badge.svg)](https://github.com/cirKITers/phasespace-jax/actions/workflows/ci.yml)
+[![docs](https://github.com/cirKITers/phasespace-jax/actions/workflows/docs.yml/badge.svg)](https://cirkiters.github.io/phasespace-jax/)
 [![PyPI](https://img.shields.io/pypi/v/phasespace-jax.svg)](https://pypi.org/project/phasespace-jax/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
@@ -15,7 +15,7 @@ This fork replaces the [TensorFlow](https://github.com/tensorflow/tensorflow) de
 [JAX](https://github.com/jax-ml/jax) and makes the generation jit-compatible.
 The algorithm (GENBOD, Raubold-Lynch, CERN 68-15) are is the exact same as in the original implementation and produce bit-identical events (see [Physics Validation](#physics-validation)).
 We also left the API (and return values) and the `DecayLanguage` integration the same, so you can use `phasespace-jax` it almost as an drop-in replacement.
-Please see the [documentation](https://stroblme.github.io/phasespace-jax/) for reference on the exact details.
+Please see the [documentation](https://cirkiters.github.io/phasespace-jax/) for reference on the exact details.
 
 Now, what is different:
 
@@ -59,7 +59,7 @@ $ pip install "jax[cuda13]"   # SM 7.5 and newer, Turing onwards (driver >= 580)
 
 Phasespace can directly be used to generate from a DecayChain using the
 [DecayLanguage](https://github.com/scikit-hep/decaylanguage) package as
-[explained in the tutorial](https://stroblme.github.io/phasespace-jax/GenMultiDecay_Tutorial/).
+[explained in the tutorial](https://cirkiters.github.io/phasespace-jax/GenMultiDecay_Tutorial/).
 
 The generation of simple `n`-body decays can be done using the `nbody_decay` shortcut to create a
 decay chain with a very simple interface: one needs to pass the mass of the top particle and the
@@ -191,11 +191,11 @@ allows generating events in pieces:
 weights, particles = bz.generate(n_events=10_000_000, key=42, chunk_size=1_000_000)
 ```
 
-Refer to the [documentation](https://stroblme.github.io/phasespace-jax/usage/#running-on-a-gpu)
+Refer to the [documentation](https://cirkiters.github.io/phasespace-jax/usage/#running-on-a-gpu)
 for more details.
 
 More examples can be found in the `tests` folder and in the
-[documentation](https://stroblme.github.io/phasespace-jax/usage/).
+[documentation](https://cirkiters.github.io/phasespace-jax/usage/).
 
 ## Physics validation
 
