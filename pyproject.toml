@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Physics",
 ]
 keywords = ["JAX", "phasespace", "HEP"]
-urls = { Homepage = "https://github.com/stroblme/phasespace-jax" }
+urls = { Homepage = "https://stroblme.github.io/phasespace-jax/", Repository = "https://github.com/stroblme/phasespace-jax", Documentation = "https://stroblme.github.io/phasespace-jax/", Changelog = "https://stroblme.github.io/phasespace-jax/changelog/" }
 requires-python = ">=3.10"
 dependencies = [
     "jax>=0.4.35",
@@ -63,12 +63,8 @@ test = [
 doc = [
     "phasespace-jax[fromdecay]",
     "phasespace-jax[vector]",
-    "graphviz",
-    "Sphinx",
-    "myst-nb",
-    "pydata-sphinx-theme",
-    "jupyter_sphinx",
-    "sphinx-math-dollar",
+    "zensical",
+    "mkdocstrings-python",
 ]
 dev = [
     "phasespace-jax[doc]",
@@ -89,7 +85,7 @@ packages = ["src/phasespace"]
 
 [tool.ruff]
 line-length = 120
-extend-exclude = ["data", "paper", "scripts"]
+extend-exclude = ["data", "scripts"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "UP", "B", "C4", "RUF"]
@@ -99,7 +95,6 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"docs/conf.py" = ["E402"]
 "tests/test_physics.py" = ["E402"] # matplotlib backend has to be set before importing pyplot
 
 [tool.ty.rules]
