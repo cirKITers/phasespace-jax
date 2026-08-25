@@ -206,6 +206,64 @@ The helpers in [`phasespace.kinematics`][phasespace.kinematics] deliberately fol
 of their caller instead of forcing their own, so that they stay composable with `jax.jit`. Use them
 under x64.
 
+## Running on a GPU
+
+All that is needed is a CUDA-enabled `jaxlib`, depending on the CUDA version supported by the GPU:
+
+```bash
+pip install "jax[cuda13]"
+```
+
+`phasespace` deliberately has no device API of its own, since JAX already provides one:
+
+```python
+import jax
+
+print(jax.devices())  # [CudaDevice(id=0)] once a CUDA-enabled jaxlib is installed
+
+with jax.default_device(jax.devices("gpu")[0]):
+    weights, particles = bz.generate(n_events=10_000, key=42)
+```
+
+`JAX_PLATFORMS=cuda` or `JAX_PLATFORMS=cpu` picks the backend for a whole run instead. Note
+that it *restricts* JAX to that one backend rather than just choosing a default, so
+`jax.devices("cpu")` raises `RuntimeError` under `JAX_PLATFORMS=cuda`. Leave it unset if you
+want to reach both backends from one process.
+
+Note that the computation is mostly memory-bandwidth-bound rather than FLOP-bound/
+Measure your own card with `benchmark/bench_phasespace.py`.
+
+Results are not bit-identical between CPU and GPU.
+The PRNG is, being backend-independent by construction, but the arithmetic differs
+by a few ULP per operation.
+
+### Memory
+
+An event costs 32 bytes per particle, four `float64` components, plus 8 bytes for its weight.
+Generating 10 million `B -> 3pi` events returns 0.97 GiB and peaks at 3.2 GiB on the device, so
+budget approximately three times the size of the result. When a run does not fit, `chunk_size`
+generates it in pieces:
+
+```python
+weights, particles = bz.generate(n_events=10_000_000, key=42, chunk_size=1_000_000)
+```
+
+The same 10 million events then peak at 2.1 GiB instead of 3.2 GiB. Note that this bounds the
+memory of the *generation*, not of the returned arrays: the chunks and the array they are
+concatenated into are both live at the end, so the floor is about twice the size of the result
+however small the chunks are. If the result itself does not fit, consume the chunks yourself.
+
+Each chunk consumes its own split of `key`, so a chunked run draws a different sample than an
+unchunked one with the same key. Both are equally valid and equally reproducible. As a side effect
+chunking also bounds recompilation, since a fixed `chunk_size` means at most two compiled
+functions, a full chunk and the remainder, whatever `n_events` is.
+
+XLA preallocates 75% of the GPU memory on the first computation. If you share the card,
+`XLA_PYTHON_CLIENT_PREALLOCATE=false` or `XLA_PYTHON_CLIENT_MEM_FRACTION=.5` keeps it in check.
+
+Finally, `PHASESPACE_EAGER=1` disables jit and dispatches every operation on its own. It is a CPU
+debugging aid and is pathologically slow on a GPU.
+
 ## Random numbers
 
 Random number generation in JAX is purely functional: rather than relying on a global generator

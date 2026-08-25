@@ -6,6 +6,17 @@ Entries up to and including 1.10.0 are the history of the upstream
 ## Develop
 
 ### Major Features and Improvements
+- The generation runs on a GPU with no code change, given a CUDA-enabled `jaxlib`
+  (`pip install "jax[cuda12]"` for Maxwell to Volta, `"jax[cuda13]"` from Turing on).
+  Actual speedup depends on the number of events and the device.
+  CPU and GPU results agree to a few ULP rather than bit-exactly, the PRNG itself being
+  backend-independent.
+- `generate` takes a `chunk_size` argument, which generates the events in chunks instead of all at
+  once and bounds the peak memory of the generation. Each chunk consumes its own split of `key`, so
+  a chunked run draws a different but equally reproducible sample.
+- Replaced `jnp.sort` in the generation with an explicit compare-exchange network, as the sorted
+  axis holds only `n_particles - 2` entries. XLA lowered the sort along that short axis to its
+  general sort. The generated events are bit-identical.
 - Ported the computational backend from TensorFlow to JAX. The generation is compiled with
   `jax.jit`, which speeds up `generate` by roughly a factor 4-5 on CPU for a 1M event
   `B -> 3pi` decay.

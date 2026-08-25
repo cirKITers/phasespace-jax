@@ -49,6 +49,12 @@ To install the necessary dependencies to be used with
 $ pip install "phasespace-jax[fromdecay]"
 ```
 
+For GPU, check your CUDA version first and install jaxlib alongside with it, e.g.:
+
+```console
+$ pip install "jax[cuda13]"   # SM 7.5 and newer, Turing onwards (driver >= 580)
+```
+
 ## How to use
 
 Phasespace can directly be used to generate from a DecayChain using the
@@ -160,6 +166,33 @@ jax.config.update("jax_enable_x64", True)
 
 or cast them explicity to 32-bit.
 **Implicit casting will raise a warning and silently truncates. You have been warned.**
+
+### Running on a GPU
+
+Assuming proper [installation](#installing), you can run directly on a GPU via:
+
+```python
+import jax
+
+print(jax.devices())  # [CudaDevice(id=0)] once a CUDA-enabled jaxlib is installed
+
+with jax.default_device(jax.devices("gpu")[0]):
+    weights, particles = bz.generate(n_events=10_000, key=42)
+```
+
+
+Note that the generation is `float64` throughout (see [Jax Treats and Traps](#jax-treats-and-traps)).
+This means that the GPU has to support double precision which, on consumer hardware, might end up
+being slower than just running on CPU (depending on the number of events).
+Furthermore, memory might become a limitation, which is why we added a `chunk_size` argument that
+allows generating events in pieces:
+
+```python
+weights, particles = bz.generate(n_events=10_000_000, key=42, chunk_size=1_000_000)
+```
+
+Refer to the [documentation](https://stroblme.github.io/phasespace-jax/usage/#running-on-a-gpu)
+for more details.
 
 More examples can be found in the `tests` folder and in the
 [documentation](https://stroblme.github.io/phasespace-jax/usage/).
