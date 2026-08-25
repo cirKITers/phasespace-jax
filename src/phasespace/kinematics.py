@@ -6,11 +6,9 @@
 # =============================================================================
 """Basic kinematics."""
 
-import tensorflow.experimental.numpy as tnp
-from phasespace.backend import function, function_jit
+import jax.numpy as jnp
 
 
-@function_jit
 def scalar_product(vec1, vec2):
     """Calculate scalar product of two 3-vectors.
 
@@ -21,10 +19,9 @@ def scalar_product(vec1, vec2):
     Returns:
         Scalar product of the two vectors.
     """
-    return tnp.sum(vec1 * vec2, axis=1)
+    return jnp.sum(vec1 * vec2, axis=1)
 
 
-@function_jit
 def spatial_component(vector):
     """Extract spatial components of the input Lorentz vector.
 
@@ -34,10 +31,9 @@ def spatial_component(vector):
     Returns:
         Spatial components (3-vector) of the input Lorentz vector.
     """
-    return tnp.take(vector, indices=[0, 1, 2], axis=-1)
+    return vector[..., 0:3]
 
 
-@function_jit
 def time_component(vector):
     """Extract time component of the input Lorentz vector.
 
@@ -47,10 +43,9 @@ def time_component(vector):
     Returns:
         Time component of the input Lorentz vector.
     """
-    return tnp.take(vector, indices=[3], axis=-1)
+    return vector[..., 3:4]
 
 
-@function
 def x_component(vector):
     """Extract spatial X component of the input Lorentz or 3-vector.
 
@@ -60,10 +55,9 @@ def x_component(vector):
     Returns:
         X component of the input vector.
     """
-    return tnp.take(vector, indices=[0], axis=-1)
+    return vector[..., 0:1]
 
 
-@function_jit
 def y_component(vector):
     """Extract spatial Y component of the input Lorentz or 3-vector.
 
@@ -73,10 +67,9 @@ def y_component(vector):
     Returns:
         Y component of the input vector.
     """
-    return tnp.take(vector, indices=[1], axis=-1)
+    return vector[..., 1:2]
 
 
-@function_jit
 def z_component(vector):
     """Extract spatial Z component of the input Lorentz or 3-vector.
 
@@ -86,10 +79,9 @@ def z_component(vector):
     Returns:
         Z component of the input vector.
     """
-    return tnp.take(vector, indices=[2], axis=-1)
+    return vector[..., 2:3]
 
 
-@function_jit
 def mass(vector):
     """Calculate mass scalar for Lorentz 4-momentum.
 
@@ -99,12 +91,9 @@ def mass(vector):
     Returns:
         Mass of the Lorentz 4-momentum vector.
     """
-    return tnp.sqrt(
-        tnp.sum(tnp.square(vector) * metric_tensor(), axis=-1, keepdims=True)
-    )
+    return jnp.sqrt(jnp.sum(jnp.square(vector) * metric_tensor(), axis=-1, keepdims=True))
 
 
-@function_jit
 def lorentz_vector(space, time):
     """Make a Lorentz vector from spatial and time components.
 
@@ -115,10 +104,9 @@ def lorentz_vector(space, time):
     Returns:
         Lorentz 4-vector combining spatial and time components.
     """
-    return tnp.concatenate([space, time], axis=-1)
+    return jnp.concatenate([space, time], axis=-1)
 
 
-@function_jit
 def lorentz_boost(vector, boostvector):
     """Perform Lorentz boost.
 
@@ -131,25 +119,26 @@ def lorentz_boost(vector, boostvector):
         Boosted 4-vector.
     """
     boost = spatial_component(boostvector)
-    b2 = tnp.expand_dims(scalar_product(boost, boost), axis=-1)
+    b2 = jnp.expand_dims(scalar_product(boost, boost), axis=-1)
 
     def boost_fn():
-        gamma = 1.0 / tnp.sqrt(1.0 - b2)
+        gamma = 1.0 / jnp.sqrt(1.0 - b2)
         gamma2 = (gamma - 1.0) / b2
         ve = time_component(vector)
         vp = spatial_component(vector)
-        bp = tnp.expand_dims(scalar_product(vp, boost), axis=-1)
+        bp = jnp.expand_dims(scalar_product(vp, boost), axis=-1)
         vp2 = vp + (gamma2 * bp + gamma * ve) * boost
         ve2 = gamma * (ve + bp)
         return lorentz_vector(vp2, ve2)
 
     # if boost vector is zero, return the original vector
-    all_b2_zero = tnp.all(tnp.equal(b2, tnp.zeros_like(b2)))
-    boosted_vector = tnp.where(all_b2_zero, vector, boost_fn())
-    return boosted_vector
+    # NOTE: both branches are always evaluated and boost_fn() divides by b2, so the discarded
+    # branch holds NaNs for a zero boost. Harmless for values, but `jax.grad` would propagate
+    # them; a double-where would be needed if gradients are ever wanted here.
+    all_b2_zero = jnp.all(jnp.equal(b2, jnp.zeros_like(b2)))
+    return jnp.where(all_b2_zero, vector, boost_fn())
 
 
-@function_jit
 def beta(vector):
     """Calculate beta of a given 4-vector.
 
@@ -162,7 +151,6 @@ def beta(vector):
     return mass(vector) / time_component(vector)
 
 
-@function_jit
 def boost_components(vector):
     """Get the boost components of a given 4-vector.
 
@@ -175,14 +163,13 @@ def boost_components(vector):
     return spatial_component(vector) / time_component(vector)
 
 
-@function_jit
 def metric_tensor():
     """Metric tensor for Lorentz space (constant).
 
     Returns:
         Metric tensor for Lorentz space with signature (-1, -1, -1, 1).
     """
-    return tnp.asarray([-1.0, -1.0, -1.0, 1.0], dtype=tnp.float64)
+    return jnp.asarray([-1.0, -1.0, -1.0, 1.0], dtype=jnp.float64)
 
 
 # EOF
