@@ -24,8 +24,12 @@ Entries up to and including 1.10.0 are the history of the upstream
   declared it, has been dropped.
 - Kinematically forbidden decays raise `ValueError` instead of
   `tf.errors.InvalidArgumentError`.
-- Importing `phasespace` enables the double precision mode of JAX process-wide, which is required
-  for the numerical stability of the phase space computation.
+- `generate` enables the double precision mode of JAX for the duration of the call and returns
+  `float64` arrays regardless of the caller's setting, as the computation is not numerically stable
+  in single precision. Importing `phasespace` does not change any global JAX setting. Note that
+  with x64 mode off, further *JAX* operations on the returned arrays downcast them to `float32` and
+  warn, while converting to numpy preserves them. The helpers in `phasespace.kinematics` follow the
+  precision of their caller so that they stay composable with `jax.jit`.
 - `GenMultiDecay.generate` accepts a `key` argument. Its decay mode assignment was previously
   drawn from the global TensorFlow seed and ignored the seeding mechanism entirely.
 - Removed the `generate_tensor`, `Particle` and `generate_decay` stubs, which only raised.
