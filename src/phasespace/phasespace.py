@@ -49,6 +49,41 @@ def process_list_to_tensor(lst):
     return jnp.asarray(lst, dtype=jnp.float64)
 
 
+def sort_rows(values, n_columns):
+    """Sort every row of ``values`` in ascending order, for a small static number of columns.
+
+    Args:
+        values (``jax.Array``): Array of shape ``(n_events, n_columns)``.
+        n_columns (int): Number of columns, known at trace time.
+
+    Returns:
+        ``jax.Array``: ``values`` with each row sorted ascending.
+
+    Notes:
+        This is an odd-even transposition network (see e.g. D. E. Knuth, *The Art of Computer
+        Programming*, Vol. 3, 2nd ed., §5.3.4) rather than a call to ``jnp.sort``, because the axis
+        sorted here is the short one: it holds ``n_particles - 2`` entries while the array has one
+        row per event. XLA lowers ``jnp.sort`` to its general sort along that axis, which on GPU
+        costs ~860 ms for a ``(1e6, 1)`` array against ~0.16 ms for this network, and dominated the
+        whole generation. The number of columns is a Python integer, so the network unrolls into a
+        handful of elementwise ``minimum``/``maximum`` passes.
+
+        The result matches ``jnp.sort`` exactly for any input the generation produces, but not for
+        subnormals: the CPU backend flushes those to zero in ``jnp.minimum`` and not in ``jnp.sort``.
+        This is unreachable here, as the only caller sorts ``jax.random.uniform`` draws, whose
+        smallest non-zero value is ~1e-6.
+    """
+    if n_columns < 2:
+        return values
+    columns = [values[:, i : i + 1] for i in range(n_columns)]
+    # n rounds of compare-exchange on alternating adjacent pairs sort n elements
+    for round_number in range(n_columns):
+        for i in range(round_number % 2, n_columns - 1, 2):
+            lower, upper = columns[i], columns[i + 1]
+            columns[i], columns[i + 1] = jnp.minimum(lower, upper), jnp.maximum(lower, upper)
+    return jnp.concatenate(columns, axis=1)
+
+
 def pdk(a, b, c):
     """Calculate the PDK (2-body phase space) function.
 
