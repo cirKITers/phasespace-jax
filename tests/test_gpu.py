@@ -31,9 +31,7 @@ requires_gpu = pytest.mark.skipif(not _GPUS, reason="no GPU backend available")
 requires_both = pytest.mark.skipif(not (_GPUS and _CPUS), reason="needs both a CPU and a GPU backend")
 
 # CPU and GPU differ by a few ULP per operation, mostly through the transcendentals and the
-# cancellation in `pdk`. Measured on a Tesla P100 over 20k three-body events: 3e-11 absolute on
-# momenta of order 2.6e3 (1.2e-14 relative) and 2.1e-12 relative on the weights. The tolerances
-# below sit roughly 30x above that, which leaves ULP noise through but not a real disagreement.
+# cancellation in `pdk`.
 MOMENTUM_RTOL, MOMENTUM_ATOL = 1e-12, 1e-9
 WEIGHT_RTOL = 1e-10
 
