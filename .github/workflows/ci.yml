@@ -24,6 +24,21 @@ on:
 
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Ruff lint
+        run: uvx ruff check src tests benchmark docs/conf.py data
+      - name: Ruff format
+        run: uvx ruff format --check src tests benchmark docs/conf.py data
+      - name: Type check
+        run: uvx ty check src
+
   download-data:
     runs-on: ubuntu-latest
     steps:
