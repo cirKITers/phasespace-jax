@@ -147,9 +147,17 @@ for i in range(10):
 Setting the environment variable `PHASESPACE_EAGER=1` (or calling `jax.disable_jit()`) makes
 everything run eagerly, which is useful when debugging the internals.
 
-Importing `phasespace` enables JAX's double precision mode
-(`jax.config.update("jax_enable_x64", True)`) process-wide, as the phase space computation is not
-numerically stable in single precision.
+**Notably, the phase space computation is not numerically stable in single precision.**
+We therefore enable JAX's double precision mode for the duration of the calls where it's needed, thus arrays are always `float64`.
+Importing `phasespace` does not change global JAX setting, so when you want to continue working with 64-bit values, run
+
+```python
+import jax
+jax.config.update("jax_enable_x64", True)
+```
+
+or cast them explicity to 32-bit.
+Implicit casting will raise a warning.
 
 More examples can be found in the `tests` folder and in the
 [documentation](https://stroblme.github.io/phasespace-jax/usage/).
