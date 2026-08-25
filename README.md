@@ -32,6 +32,8 @@ Now, what is different:
 | Distribution name | `phasespace` | `phasespace-jax`, imported as `phasespace` |
 | Speed | reference | ≈4-5x faster for 1M `B -> 3pi` events on CPU |
 
+Note that event generation won't work with 32-bit data. See the corresponding note for details [here](#jax-treats-and-traps).
+
 ## Installing
 
 To install with pip:
@@ -133,7 +135,7 @@ weights, particles = bz.generate(n_events=1000)                  # fresh key, no
 
 Passing the same key twice returns the very same events.
 
-### Compilation
+### JAX Treats and Traps
 
 The generation is JIT-compiled with `jax.jit`. The number of events is a *static* argument, so a
 call with a new `n_events` triggers a recompilation while repeated calls with the same value reuse
@@ -157,7 +159,7 @@ jax.config.update("jax_enable_x64", True)
 ```
 
 or cast them explicity to 32-bit.
-Implicit casting will raise a warning.
+**Implicit casting will raise a warning and silently truncates. You have been warned.**
 
 More examples can be found in the `tests` folder and in the
 [documentation](https://stroblme.github.io/phasespace-jax/usage/).
