@@ -1,15 +1,21 @@
-# PhaseSpace
+# phasespace-jax
 
-This repo is a fork of the [original phasespace](https://github.com/zfit/phasespace) repo.
-Please refer to their repo for any background information or when citing in scientific publication.
+[![tests](https://github.com/stroblme/phasespace-jax/actions/workflows/ci.yml/badge.svg)](https://github.com/stroblme/phasespace-jax/actions/workflows/ci.yml)
+[![docs](https://github.com/stroblme/phasespace-jax/actions/workflows/docs.yml/badge.svg)](https://stroblme.github.io/phasespace-jax/)
+[![PyPI](https://img.shields.io/pypi/v/phasespace-jax.svg)](https://pypi.org/project/phasespace-jax/)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+
+>This repo is a fork of the original [zfit/phasespace](https://github.com/zfit/phasespace) repo.\
+>Please refer to their repo for any background information or when citing in scientific publication.\
+>Checkout the [License](#license-and-attribution) and [Citing](#citing) section.
 
 ## What is different
 
-The fork replaces the [TensorFlow](https://github.com/tensorflow/tensorflow) dependency with
+This fork replaces the [TensorFlow](https://github.com/tensorflow/tensorflow) dependency with
 [JAX](https://github.com/jax-ml/jax) and makes the generation jit-compatible.
-The algorithm (GENBOD, Raubold-Lynch, CERN 68-15) are is the exact same as in the original implementation and produce bit-identical events.
+The algorithm (GENBOD, Raubold-Lynch, CERN 68-15) are is the exact same as in the original implementation and produce bit-identical events (see [Physics Validation](#physics-validation)).
 We also left the API (and return values) and the `DecayLanguage` integration the same, so you can use `phasespace-jax` it almost as an drop-in replacement.
-Please see the [documentation]() for reference on the exact details.
+Please see the [documentation](https://stroblme.github.io/phasespace-jax/) for reference on the exact details.
 
 Now, what is different:
 
@@ -45,7 +51,7 @@ $ pip install "phasespace-jax[fromdecay]"
 
 Phasespace can directly be used to generate from a DecayChain using the
 [DecayLanguage](https://github.com/scikit-hep/decaylanguage) package as
-[explained in the tutorial](https://phasespace.readthedocs.io/en/latest/GenMultiDecay_Tutorial.html).
+[explained in the tutorial](https://stroblme.github.io/phasespace-jax/GenMultiDecay_Tutorial/).
 
 The generation of simple `n`-body decays can be done using the `nbody_decay` shortcut to create a
 decay chain with a very simple interface: one needs to pass the mass of the top particle and the
@@ -146,7 +152,7 @@ Importing `phasespace` enables JAX's double precision mode
 numerically stable in single precision.
 
 More examples can be found in the `tests` folder and in the
-[documentation](https://phasespace.readthedocs.io/en/latest/usage.html).
+[documentation](https://stroblme.github.io/phasespace-jax/usage/).
 
 ## Physics validation
 
@@ -163,3 +169,20 @@ through GitHub Actions. This validation is performed at two levels:
 
 The results of all physics validation performed by the `test_physics.py` test are written in
 `tests/plots`.
+
+## Citing
+
+This fork does not change the physics, so please cite the original work:
+
+> A. Puig Navarro and J. Eschle, *phasespace: n-body phase space generation in Python*,
+> Journal of Open Source Software **4**(42), 1570 (2019), [doi:10.21105/joss.01570](https://doi.org/10.21105/joss.01570).
+
+The underlying algorithm is described in F. James, *Monte Carlo Phase Space*, CERN-68-15 (1968).
+If you additionally want to reference this fork specifically, see [CITATION.cff](CITATION.cff).
+
+## License and attribution
+
+`phasespace-jax` is a derivative work of [zfit/phasespace](https://github.com/zfit/phasespace), copyright (c) 2019 zfit, and is distributed under the same [BSD-3-Clause license](LICENSE). 
+The original copyright notice is retained in full. See [AUTHORS.md](AUTHORS.md) for the original authors.
+
+This fork is not affiliated with or endorsed by the zfit project.
