@@ -135,7 +135,7 @@ class GenMultiDecay:
 
         Notes:
             For a more in-depth tutorial, see the tutorial on GenMultiDecay in the
-            `documentation <https://phasespace.readthedocs.io/en/stable/GenMultiDecay_Tutorial.html>`__.
+            `documentation <https://stroblme.github.io/phasespace-jax/GenMultiDecay_Tutorial/>`__.
         """
         if tolerance is None:
             tolerance = cls.MASS_WIDTH_TOLERANCE
