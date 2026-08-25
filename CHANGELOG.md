@@ -1,0 +1,180 @@
+# Changelog
+
+Entries up to and including 1.10.0 are the history of the upstream
+[zfit/phasespace](https://github.com/zfit/phasespace) project this package was forked from.
+
+## Develop
+
+### Major Features and Improvements
+- Ported the computational backend from TensorFlow to JAX. The generation is compiled with
+  `jax.jit`, which speeds up `generate` by roughly a factor 4-5 on CPU for a 1M event
+  `B -> 3pi` decay.
+- The mass functions of `phasespace.fromdecay` (`gauss`, `bw`, `relbw`) are now sampled
+  directly with JAX by inverse transform sampling instead of through zfit PDFs, which removes the
+  zfit and zfit-physics dependencies.
+
+### Behavioral changes
+- `generate` takes a `key` argument instead of `seed`, which is either an integer, a JAX PRNG
+  key or None. JAX random number generation is purely functional: passing the same key twice yields
+  identical events, whereas a `tf.random.Generator` advanced its state between calls.
+- `n_events` has to be a Python integer and is a static argument of the compiled function.
+  Generating with a new value of `n_events` recompiles. `tf.Variable` is no longer accepted.
+- Mass functions of resonances are called as `mass(min_mass, max_mass, n_events, key)` and have to
+  be jit-compatible. The previous signature inspection, which passed `seed` only if the function
+  declared it, has been dropped.
+- Kinematically forbidden decays raise `ValueError` instead of
+  `tf.errors.InvalidArgumentError`.
+- Importing `phasespace` enables the double precision mode of JAX process-wide, which is required
+  for the numerical stability of the phase space computation.
+- `GenMultiDecay.generate` accepts a `key` argument. Its decay mode assignment was previously
+  drawn from the global TensorFlow seed and ignored the seeding mechanism entirely.
+- Removed the `generate_tensor`, `Particle` and `generate_decay` stubs, which only raised.
+- `phasespace.numpy` is now `jax.numpy` instead of `tensorflow.experimental.numpy`.
+
+### Bug fixes and small changes
+- Resonance masses are now drawn from the key passed to `generate`. Previously they were drawn
+  from the global TensorFlow generator, so seeded generation of decays with resonances was not
+  reproducible.
+- `PHASESPACE_EAGER=0` now correctly means "not eager". The value was previously interpreted as a
+  non-empty string and therefore enabled eager mode as well.
+- The `fromdecay` import error no longer passes an invalid `file` keyword to
+  `ModuleNotFoundError`, which masked the intended message with a `TypeError`.
+
+### Requirement changes
+- Requires `jax >= 0.4.35`. `tensorflow` and `tensorflow_probability` are no longer required,
+  and the `tf`/`tensorflow` extras were removed.
+- The `fromdecay` extra no longer requires `zfit` and `zfit-physics`.
+
+
+## 1.10.0 (16 Apr 2024)
+
+Add support for Python 3.12, drop support for 3.8
+
+### Major Features and Improvements
+
+- integrating [vector](https://vector.readthedocs.io/en/latest/index.html) support for `generate`: `boost_to` can be a Momentum Lorentz vector and return the boosted particles as a vector using `as_vectors=True`.
+
+### Requirement changes
+
+Upgrade to TensorFlow > 0.16
+
+## 1.9.0 (20 Jul 2023)
+
+Add support for Python 3.11, drop support for 3.7
+
+## 1.8.0 (27 Jan 2023)
+
+### Requirement changes
+- upgrade to zfit >= 0.10.0 and zfit-physics >= 0.3.0
+- pinning uproot and awkward to ~4 and ~1, respectively
+
+## 1.7.0 (1. Sep 2022)
+
+Upgraded Python and TensorFlow version.
+
+Added `tf` and `tensorflow` extra to requirements. If you intend to use
+phasespace with TensorFlow in the future (and not another backend like numpy or JAX),
+make sure to always install with `phasespace[tf]`.
+
+### Requirement changes
+- upgrade to TensorFlow >= 2.7
+- Python from 3.7 to 3.10 is now supported
+
+## 1.6.0 (14 Apr 2022)
+
+### Major Features and Improvements
+- Improved GenMultiDecay to have better control on the decay mass of non-stable particles.
+- Added a `particle_model_map` argument to the `GenMultiDecay` class. This is a
+  dict where the key is a particle name and the value is a mass function name.
+  The feature can be seen in the
+  [GenMultiDecay Tutorial](https://github.com/zfit/phasespace/blob/master/docs/GenMultiDecay_Tutorial.ipynb).
+
+## 1.5.0 (27 Nov 2021)
+
+### Major Features and Improvements
+- add support to generate from a DecayChain using
+  [the decaylanguage](https://github.com/scikit-hep/decaylanguage) package from Scikit-HEP.
+  This is in the new subpackage "fromdecay" and can be used by installing the extra with
+  `pip install phasespace[fromdecay]`.
+
+### Requirement changes
+- drop Python 3.6 support
+
+### Thanks
+- to Simon Thor for contributing the `fromdecay` subpackage.
+
+## 1.4.2 (5.11.2021)
+
+### Requirement changes
+- Losen restriction on TensorFlow, allow version 2.7 (and 2.5, 2.6)
+
+## 1.4.1 (27.08.2021)
+
+### Requirement changes
+- Losen restriction on TensorFlow, allow version 2.6 (and 2.5)
+
+## 1.4.0 (11.06.2021)
+
+### Requirement changes
+- require TensorFlow 2.5 as 2.4 breaks some functionality
+
+## 1.3.0 (28.05.2021)
+
+### Major Features and Improvements
+
+- Support Python 3.9
+- Support TensorFlow 2.5
+- improved compilation in tf.functions, use of XLA where applicable
+- developer: modernization of setup, CI and more
+
+### Thanks
+
+- Remco de Boer for many commits and cleanups
+
+## 1.2.0 (17.12.20)
+
+### Major Features and Improvements
+
+- Python 3.8 support
+- Allow eager execution by setting with `tf.config.run_functions_eagerly(True)`
+  or the environment variable "PHASESPACE_EAGER"
+- Deterministic random number generation via seed
+  or `tf.random.Generator` instance
+
+### Behavioral changes
+
+### Bug fixes and small changes
+
+### Requirement changes
+
+- tighten TensorFlow to 2.3/2.4
+- tighten TensorFlow Probability to 0.11/0.12
+
+### Thanks
+- Remco de Boer and Stefan Pflüger for discussions on random number genration
+
+## 1.1.0 (27.1.2020)
+
+This release switched to TensorFlow 2.0 eager mode. Please upgrade your TensorFlow installation if possible and change
+your code (minimal changes) as described under "Behavioral changes".
+In case this is currently impossible to do, please downgrade to < 1.1.0.
+
+### Major Features and Improvements
+- full TF2 compatibility
+
+### Behavioral changes
+- `generate` now returns an eager Tensor. This is basically a numpy array wrapped by TensorFlow.
+   To explicitly convert it to a numpy array, use the `numpy()` method of the eager Tensor.
+- `generate_tensor` is now depreceated, `generate` can directly be used instead.
+
+### Bug fixes and small changes
+
+### Requirement changes
+- requires now TensorFlow >= 2.0.0
+
+
+## 1.0.4 (13-10-2019)
+
+### Major Features and Improvements
+
+Release to conda-forge, thanks to Chris Burr
