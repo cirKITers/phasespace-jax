@@ -16,9 +16,13 @@ except PackageNotFoundError:
 
 __author__ = """Albert Puig Navarro"""
 __email__ = "apuignav@gmail.com"
-__maintainer__ = "zfit"
+__maintainer__ = "Melvin Strobl <stroblme@posteo.de>"
 
-__credits__ = ["Jonas Eschle <Jonas.Eschle@cern.ch>"]
+__credits__ = [
+    "Jonas Eschle <jonas.eschle@cern.ch>",
+    "Simon Thor",
+    "Eduardo Rodrigues <eduardo.rodrigues@cern.ch>",
+]
 
 __all__ = ["GenParticle", "nbody_decay", "numpy", "random", "to_vectors"]
 
