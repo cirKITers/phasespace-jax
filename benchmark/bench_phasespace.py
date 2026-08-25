@@ -83,7 +83,7 @@ class Timer:
 B_MASS = 5279.0
 PION_MASS = 139.6
 
-N_EVENTS = 1000000
+N_EVENTS = int(sys.argv[1]) if len(sys.argv) > 1 else 1000000
 CHUNK_SIZE = int(N_EVENTS)
 
 n_runs = 10
@@ -115,6 +115,8 @@ def do_run(run):
 
 
 if __name__ == "__main__":
+    # the backend is picked by JAX itself; JAX_PLATFORMS=cpu/cuda selects it for a run
+    print(f"{N_EVENTS} events on {jax.devices()}")
     test_three_body()
 
 # EOF
