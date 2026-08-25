@@ -1,9 +1,16 @@
-"""Top-level package for TensorFlow PhaseSpace."""
+"""Top-level package for JAX PhaseSpace."""
 
+import os
 from importlib.metadata import PackageNotFoundError, version
 
+import jax
+
+# Double precision is required: `pdk` suffers catastrophic cancellation close to threshold.
+# NOTE: this is a process-wide JAX setting.
+jax.config.update("jax_enable_x64", True)
+
 try:
-    __version__ = version("phasespace")
+    __version__ = version("phasespace-jax")
 except PackageNotFoundError:
     pass
 
@@ -13,21 +20,17 @@ __maintainer__ = "zfit"
 
 __credits__ = ["Jonas Eschle <Jonas.Eschle@cern.ch>"]
 
-__all__ = ["nbody_decay", "GenParticle", "random", "to_vectors", "numpy"]
+__all__ = ["GenParticle", "nbody_decay", "numpy", "random", "to_vectors"]
 
-import tensorflow.experimental.numpy as numpy
+import jax.numpy as numpy  # noqa: E402
 
-from . import random
-from .phasespace import GenParticle, nbody_decay, to_vectors
+from . import random  # noqa: E402
+from .phasespace import GenParticle, nbody_decay, to_vectors  # noqa: E402
 
 
 def _set_eager_mode():
-    import os
-
-    import tensorflow as tf
-
-    is_eager = bool(os.environ.get("PHASESPACE_EAGER"))
-    tf.config.run_functions_eagerly(is_eager)
+    if os.environ.get("PHASESPACE_EAGER", "").lower() not in ("", "0", "false"):
+        jax.config.update("jax_disable_jit", True)
 
 
 _set_eager_mode()

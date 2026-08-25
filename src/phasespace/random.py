@@ -1,40 +1,39 @@
 """Random number generation.
 
-As the random number generation is not a trivial thing, this module handles it uniformly.
-
-It mimics the TensorFlows API on random generators and relies (currently) in global states on the TF states.
-Especially on the global random number generator which will be used to get new generators.
+JAX random number generation is purely functional: every draw is an explicit function of a
+PRNG key. This module only normalizes what users may pass as a key.
 """
 
-import tensorflow as tf
+from __future__ import annotations
 
-SeedLike = int | tf.random.Generator | None
+import secrets
+
+import jax
+import numpy as np
+
+KeyLike = int | jax.Array | None
 
 
-def get_rng(seed: SeedLike = None) -> tf.random.Generator:
-    """Get or create random number generator of type `tf.random.Generator`.
-
-    This can be used to either retrieve random number generators deterministically from them
-    - global random number generator from TensorFlow,
-    - from a random number generator generated from the seed or
-    - from the random number generator passed.
-
-    Both when using either the global generator or a random number generator is passed, they advance
-    by exactly one step as `split` is called on them.
+def ensure_key(key: KeyLike = None) -> jax.Array:
+    """Normalize a user-supplied key into a JAX PRNG key.
 
     Args:
-        seed: This can be
-          - `None` to get the global random number generator
-          - a numerical seed to create a random number generator
-          - a `tf.random.Generator`.
+        key: This can be
+          - `None` to create a new, non-reproducible key from OS entropy,
+          - an integer seed to create a key deterministically,
+          - a JAX PRNG key, which is returned unchanged.
 
     Returns:
-        A list of `tf.random.Generator`
+        A JAX PRNG key.
+
+    Notes:
+        Never call this with `None` inside a jitted function: the key would be created once at
+        trace time and every call would then reuse the very same random numbers.
     """
-    if seed is None:
-        rng = tf.random.get_global_generator()
-    elif not isinstance(seed, tf.random.Generator):  # it's a seed, not an rng
-        rng = tf.random.Generator.from_seed(seed=seed)
-    else:
-        rng = seed
-    return rng
+    if key is None:
+        return jax.random.key(secrets.randbits(63))
+    if isinstance(key, (int, np.integer)):
+        return jax.random.key(int(key))
+    if isinstance(key, (jax.Array, np.ndarray)):
+        return key  # a PRNG key; jax.random validates it on use
+    raise TypeError(f"Expected an int seed, a JAX PRNG key or None, got {type(key).__name__}.")
