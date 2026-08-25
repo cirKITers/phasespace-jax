@@ -84,7 +84,6 @@ version.source = "vcs"
 build.hooks.vcs.version-file = "src/phasespace/_version.py"
 metadata.allow-direct-references = true
 
-# the distribution is named phasespace-jax, the import package stays phasespace
 [tool.hatch.build.targets.wheel]
 packages = ["src/phasespace"]
 
