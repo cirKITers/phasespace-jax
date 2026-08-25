@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import itertools
-from collections.abc import Callable
+import math
+from collections.abc import Callable, Mapping
 
-import tensorflow as tf
-import tensorflow.experimental.numpy as tnp
+import jax
+import jax.numpy as jnp
+import numpy as np
 from particle import Particle
+
 from phasespace import GenParticle
+from phasespace.random import KeyLike, ensure_key
 
 from .mass_functions import DEFAULT_CONVERTER
 
@@ -28,9 +32,9 @@ class GenMultiDecay:
     def from_dict(
         cls,
         dec_dict: dict,
-        mass_converter: dict[str, Callable] = None,
-        tolerance: float = None,
-        particle_model_map: dict[str, str] = None,
+        mass_converter: dict[str, Callable] | None = None,
+        tolerance: float | None = None,
+        particle_model_map: dict[str, str] | None = None,
     ):
         """Create a ``GenMultiDecay`` instance from a dict in the ``DecayLanguage`` package format.
 
@@ -111,17 +115,16 @@ class GenMultiDecay:
             .. code-block:: python
 
                 def custom_gauss(mass, width):
-                    particle_mass = tf.cast(mass, tf.float64)
-                    particle_width = tf.cast(width, tf.float64)
-                    def mass_func(min_mass, max_mass, n_events):
-                        min_mass = tf.cast(min_mass, tf.float64)
-                        max_mass = tf.cast(max_mass, tf.float64)
-                        # Use a zfit PDF
-                        pdf = zfit.pdf.Gauss(mu=particle_mass, sigma=particle_width, obs="")
-                        iterator = tf.stack([min_mass, max_mass], axis=-1)
-                        return tf.vectorized_map(
-                            lambda lim: pdf.sample(1, limits=(lim[0], lim[1])), iterator
+                    def mass_func(min_mass, max_mass, n_events, key):
+                        # a normal distribution truncated to the kinematic limits
+                        standard = jax.random.truncated_normal(
+                            key,
+                            lower=(min_mass - mass) / width,
+                            upper=(max_mass - mass) / width,
+                            shape=(n_events,),
+                            dtype=jnp.float64,
                         )
+                        return mass + width * standard
                     return mass_func
 
                 # Change the distribution in the dst_chain dict
@@ -153,44 +156,52 @@ class GenMultiDecay:
         return cls(gen_particles)
 
     def generate(
-        self, n_events: int, normalize_weights: bool = True, **kwargs
-    ) -> (
-        tuple[list[tf.Tensor], list[tf.Tensor]]
-        | tuple[list[tf.Tensor], list[tf.Tensor], list[tf.Tensor]]
-    ):
+        self, n_events: int, normalize_weights: bool = True, key: KeyLike = None, **kwargs
+    ) -> tuple[list[jax.Array], list[jax.Array]] | tuple[list[jax.Array], list[jax.Array], list[jax.Array]]:
         """Generate four-momentum vectors from the decay(s).
 
         Args:
             n_events: Total number of events combined, for all the decays.
             normalize_weights: Normalize weights according to all events generated.
                 This also changes the return values. See the phasespace documentation for more details.
+            key: Either an integer seed, a JAX PRNG key or None, in which case a new key is created
+                from OS entropy (and the generation is not reproducible).
             kwargs: Additional parameters passed to all calls of ``GenParticle.generate``
 
         Returns:
             The arguments returned by ``GenParticle.generate`` are returned. See the phasespace documentation for
-            details. However, instead of being 2 or 3 tensors, it is 2 or 3 lists of tensors,
+            details. However, instead of being 2 or 3 arrays, it is 2 or 3 lists of arrays,
             each entry in the lists corresponding to the return arguments from the corresponding GenParticle
             instances in ``self.gen_particles``. Note that when ``normalize_weights`` is True,
             the weights are normalized to the maximum of all returned events.
+
+        Notes:
+            The number of events per decay mode is drawn at random, so each call generally requires a
+            recompilation of the underlying ``GenParticle.generate`` calls.
         """
-        # Input to tf.random.categorical must be 2D
-        rand_i = tf.random.categorical(
-            tnp.log([[dm[0] for dm in self.gen_particles]]), n_events
+        key = ensure_key(key)
+        key, mode_key = jax.random.split(key)
+        # jax.random.categorical expects unnormalized log probabilities
+        modes = jax.random.categorical(
+            mode_key,
+            jnp.log(jnp.asarray([dm[0] for dm in self.gen_particles], dtype=jnp.float64)),
+            shape=(n_events,),
         )
-        # Input to tf.unique_with_counts must be 1D
-        dec_indices, _, counts = tf.unique_with_counts(rand_i[0])
-        counts = tf.cast(counts, tf.int64)
+        counts = np.bincount(np.asarray(modes), minlength=len(self.gen_particles))
+        keys = jax.random.split(key, len(self.gen_particles))
         weights, max_weights, events = [], [], []
-        for i, n in zip(dec_indices, counts):
-            weight, max_weight, four_vectors = self.gen_particles[i][1].generate(
-                n, normalize_weights=False, **kwargs
+        for i, n in enumerate(counts):
+            if n == 0:
+                continue
+            weight, max_weight, four_vectors = self.gen_particles[i][1].generate(  # ty: ignore[invalid-assignment]
+                int(n), normalize_weights=False, key=keys[i], **kwargs
             )
             weights.append(weight)
             max_weights.append(max_weight)
             events.append(four_vectors)
 
         if normalize_weights:
-            total_max = tnp.max([tnp.max(mw) for mw in max_weights])
+            total_max = max(float(jnp.max(mw)) for mw in max_weights)
             normed_weights = [w / total_max for w in weights]
             return normed_weights, events
 
@@ -215,7 +226,7 @@ def _unique_name(name: str, preexisting_particles: set[str]) -> str:
     name += " [0]"
     i = 1
     while name in preexisting_particles:
-        name = name[: name.rfind("[")] + f"[{str(i)}]"
+        name = name[: name.rfind("[")] + f"[{i!s}]"
         i += 1
     preexisting_particles.add(name)
     return name
@@ -223,7 +234,7 @@ def _unique_name(name: str, preexisting_particles: set[str]) -> str:
 
 def _get_particle_mass(
     name: str,
-    mass_converter: dict[str, Callable],
+    mass_converter: Mapping[str, Callable],
     mass_func: str,
     tolerance: float,
 ) -> Callable | float:
@@ -243,18 +254,18 @@ def _get_particle_mass(
     """
     particle = Particle.from_evtgen_name(name)
 
-    if particle.width <= tolerance:
-        return tf.cast(particle.mass, tf.float64)
+    if particle.width <= tolerance:  # ty: ignore[unsupported-operator]
+        return float(particle.mass)  # ty: ignore[invalid-argument-type]
     # If name does not exist in the predefined mass distributions, use Breit-Wigner
     return mass_converter[mass_func](mass=particle.mass, width=particle.width)
 
 
 def _recursively_traverse(
     decaychain: dict,
-    mass_converter: dict[str, Callable],
+    mass_converter: Mapping[str, Callable],
     particle_model_map: dict[str, str],
     tolerance: float,
-    preexisting_particles: set[str] = None,
+    preexisting_particles: set[str] | None = None,
 ) -> list[tuple[float, GenParticle]]:
     """Create all possible GenParticles by recursively traversing a dict from DecayLanguage, see Examples.
 
@@ -314,7 +325,7 @@ def _recursively_traverse(
             daughter_gens.append(daughter)
 
         for daughter_combination in itertools.product(*daughter_gens):
-            p = tnp.prod([decay[0] for decay in daughter_combination]) * dm_probability
+            p = math.prod(decay[0] for decay in daughter_combination) * dm_probability
             if is_top_particle:
                 mother_mass = Particle.from_evtgen_name(original_mother_name).mass
             else:

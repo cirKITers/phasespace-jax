@@ -6,19 +6,14 @@ that can decay in multiple different ways.
 
 from __future__ import annotations
 
-import sys
-
-from .genmultidecay import GenMultiDecay  # noqa: F401
+from .genmultidecay import GenMultiDecay
 
 try:
-    import zfit  # noqa: F401
-    import zfit_physics as zphys  # noqa: F401
     from particle import Particle  # noqa: F401
 except ModuleNotFoundError as error:
     raise ModuleNotFoundError(
-        "The fromdecay functionality in phasespace requires particle and zfit-physics. "
-        "Either install phasespace[fromdecay] or particle and zfit-physics.",
-        file=sys.stderr,
+        "The fromdecay functionality in phasespace requires particle. "
+        "Either install phasespace-jax[fromdecay] or particle."
     ) from error
 
 __all__ = ("GenMultiDecay",)
