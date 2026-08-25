@@ -7,15 +7,47 @@ Develop
 
 Major Features and Improvements
 -------------------------------
+- Ported the computational backend from TensorFlow to JAX. The generation is compiled with
+  ``jax.jit``, which speeds up ``generate`` by roughly a factor 4-5 on CPU for a 1M event
+  ``B -> 3pi`` decay.
+- The mass functions of ``phasespace.fromdecay`` (``gauss``, ``bw``, ``relbw``) are now sampled
+  directly with JAX by inverse transform sampling instead of through zfit PDFs, which removes the
+  zfit and zfit-physics dependencies.
 
 Behavioral changes
 ------------------
+- ``generate`` takes a ``key`` argument instead of ``seed``, which is either an integer, a JAX PRNG
+  key or None. JAX random number generation is purely functional: passing the same key twice yields
+  identical events, whereas a ``tf.random.Generator`` advanced its state between calls.
+- ``n_events`` has to be a Python integer and is a static argument of the compiled function.
+  Generating with a new value of ``n_events`` recompiles. ``tf.Variable`` is no longer accepted.
+- Mass functions of resonances are called as ``mass(min_mass, max_mass, n_events, key)`` and have to
+  be jit-compatible. The previous signature inspection, which passed ``seed`` only if the function
+  declared it, has been dropped.
+- Kinematically forbidden decays raise ``ValueError`` instead of
+  ``tf.errors.InvalidArgumentError``.
+- Importing ``phasespace`` enables the double precision mode of JAX process-wide, which is required
+  for the numerical stability of the phase space computation.
+- ``GenMultiDecay.generate`` accepts a ``key`` argument. Its decay mode assignment was previously
+  drawn from the global TensorFlow seed and ignored the seeding mechanism entirely.
+- Removed the ``generate_tensor``, ``Particle`` and ``generate_decay`` stubs, which only raised.
+- ``phasespace.numpy`` is now ``jax.numpy`` instead of ``tensorflow.experimental.numpy``.
 
 Bug fixes and small changes
 ---------------------------
+- Resonance masses are now drawn from the key passed to ``generate``. Previously they were drawn
+  from the global TensorFlow generator, so seeded generation of decays with resonances was not
+  reproducible.
+- ``PHASESPACE_EAGER=0`` now correctly means "not eager". The value was previously interpreted as a
+  non-empty string and therefore enabled eager mode as well.
+- The ``fromdecay`` import error no longer passes an invalid ``file`` keyword to
+  ``ModuleNotFoundError``, which masked the intended message with a ``TypeError``.
 
 Requirement changes
 -------------------
+- Requires ``jax >= 0.4.35``. ``tensorflow`` and ``tensorflow_probability`` are no longer required,
+  and the ``tf``/``tensorflow`` extras were removed.
+- The ``fromdecay`` extra no longer requires ``zfit`` and ``zfit-physics``.
 
 
 Thanks
