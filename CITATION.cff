@@ -1,21 +1,44 @@
-title: 'phasespace: n-body phase space generation in Python'
-abstract: 'This repository contains the source code of the paper phasespace: n-body phase space generation in Python by Albert Navarro and Jonas Eschle, from JOSS'
-doi: 10.21105/joss.01570
-repository-code: https://github.com/zfit/phasespace
-version: 1.0.0
-date-released: 2019-10-29
+cff-version: 1.2.0
+title: "phasespace-jax: JAX implementation of n-body phase space generation"
+abstract: >-
+  A fork of zfit/phasespace in which the TensorFlow backend is replaced by JAX. The
+  phase space generation algorithm (Raubold and Lynch, GENBOD) and the original
+  implementation are the work of the phasespace authors; if you use this package in a
+  scientific publication, please cite their paper as well (see references).
+repository-code: https://github.com/stroblme/phasespace-jax
+license: BSD-3-Clause
 authors:
-  - given-names: Albert
-    family-names: Navarro
-  - given-names: Jonas
-    family-names: Eschle
-    affiliation: University of Zurich
+  - given-names: Melvin
+    family-names: Strobl
+    email: stroblme@posteo.de
 keywords:
   - Python
+  - JAX
   - Simulation
   - High Energy Physics
   - Phasespace
   - PWA
   - kinematics
-  - null
-cff-version: 1.2.0
+references:
+  - type: article
+    title: "phasespace: n-body phase space generation in Python"
+    doi: 10.21105/joss.01570
+    journal: Journal of Open Source Software
+    volume: 4
+    issue: 42
+    start: 1570
+    year: 2019
+    month: 10
+    authors:
+      - given-names: Albert
+        family-names: Navarro
+        orcid: https://orcid.org/0000-0001-8868-2947
+      - given-names: Jonas
+        family-names: Eschle
+        orcid: https://orcid.org/0000-0002-7312-3699
+        affiliation: University of Zurich
+  - type: software
+    title: "phasespace"
+    repository-code: https://github.com/zfit/phasespace
+    authors:
+      - name: "The zfit developers"
