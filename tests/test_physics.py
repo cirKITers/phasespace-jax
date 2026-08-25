@@ -23,22 +23,17 @@ import os
 import sys
 
 import matplotlib.pyplot as plt
-import tensorflow as tf
 import uproot
+
 from phasespace import phasespace
 
 sys.path.append(os.path.dirname(__file__))
 
-from .helpers import decays, rapidsim  # noqa: E402
-from .helpers.plotting import make_norm_histo  # noqa: E402
+from .helpers import decays, rapidsim
+from .helpers.plotting import make_norm_histo
 
 BASE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PLOT_DIR = os.path.join(BASE_PATH, "tests", "plots")
-
-
-def setup_method():
-    phasespace.GenParticle._sess.close()
-    tf.compat.v1.reset_default_graph()
 
 
 def create_ref_histos(n_pions):
@@ -52,10 +47,7 @@ def create_ref_histos(n_pions):
             BASE_PATH,
             "scripts",
             "prepare_test_samples.cxx+({})".format(
-                ",".join(
-                    '"{}"'.format(os.path.join(BASE_PATH, "data", f"bto{i + 1}pi.root"))
-                    for i in range(1, 4)
-                )
+                ",".join('"{}"'.format(os.path.join(BASE_PATH, "data", f"bto{i + 1}pi.root")) for i in range(1, 4))
             ),
         )
         subprocess.call(f"root -qb '{script}'", shell=True)
@@ -83,19 +75,14 @@ def create_ref_histos(n_pions):
 def run_test(n_particles, test_prefix):
     first_run_n_events = 100
     main_run_n_events = 100000
-    n_events = tf.Variable(initial_value=first_run_n_events, dtype=tf.int64)
 
     decay = phasespace.nbody_decay(decays.B0_MASS, [decays.PION_MASS] * n_particles)
-    generate = decay.generate(n_events)
-    weights1, _ = generate  # only generate to test change in n_events
+    weights1, _ = decay.generate(first_run_n_events)  # triggers a first compilation
     assert len(weights1) == first_run_n_events
 
-    # change n_events and run again
-    n_events.assign(main_run_n_events)
-    weights, particles = decay.generate(n_events)
-    parts = np.concatenate(
-        [particles[f"p_{part_num}"] for part_num in range(n_particles)], axis=1
-    )
+    # a different n_events recompiles and must give consistent results
+    weights, particles = decay.generate(main_run_n_events)
+    parts = np.concatenate([particles[f"p_{part_num}"] for part_num in range(n_particles)], axis=1)
     histos = [
         make_norm_histo(
             parts[:, coord],
@@ -107,10 +94,7 @@ def run_test(n_particles, test_prefix):
     weight_histos = make_norm_histo(weights, range_=(0, 1 + 1e-8))
     ref_histos, ref_weights = create_ref_histos(n_particles)
     p_values = np.array(
-        [
-            ks_2samp(histos[coord], ref_histos[coord])[1]
-            for coord, _ in enumerate(histos)
-        ]
+        [ks_2samp(histos[coord], ref_histos[coord])[1] for coord, _ in enumerate(histos)]
         + [ks_2samp(weight_histos, ref_weights)[1]]
     )
     # Let's plot
@@ -137,9 +121,7 @@ def run_test(n_particles, test_prefix):
         plt.savefig(
             os.path.join(
                 PLOT_DIR,
-                "{}_pion_{}_{}.png".format(
-                    test_prefix, int(coord / 4) + 1, ["px", "py", "pz", "e"][coord % 4]
-                ),
+                "{}_pion_{}_{}.png".format(test_prefix, int(coord / 4) + 1, ["px", "py", "pz", "e"][coord % 4]),
             )
         )
         plt.clf()
@@ -191,12 +173,12 @@ def run_kstargamma(input_file, kstar_width, b_at_rest, suffix, use_vector):
         booster = booster.transpose()
         if use_vector:
             booster = vector.array(
-                dict(
-                    px=booster[:, 0],
-                    py=booster[:, 1],
-                    pz=booster[:, 2],
-                    e=booster[:, 3],
-                )
+                {
+                    "px": booster[:, 0],
+                    "py": booster[:, 1],
+                    "pz": booster[:, 2],
+                    "e": booster[:, 3],
+                }
             )
         rapidsim_getter = rapidsim.get_tree
     decay = decays.b0_to_kstar_gamma(kstar_width=kstar_width)
@@ -218,9 +200,7 @@ def run_kstargamma(input_file, kstar_width, b_at_rest, suffix, use_vector):
         for coord, coord_name in enumerate(("px", "py", "pz", "e")):
             range_ = (-3000 if coord % 4 != 3 else 0, 3000)
             ref_histo = make_norm_histo(ref_part[:, coord], range_=range_)
-            tf_histo = make_norm_histo(
-                particles[tf_part][:, coord], range_=range_, weights=norm_weights
-            )
+            tf_histo = make_norm_histo(particles[tf_part][:, coord], range_=range_, weights=norm_weights)
             plt.hist(
                 x if coord % 4 != 3 else e,
                 weights=tf_histo,
@@ -239,9 +219,7 @@ def run_kstargamma(input_file, kstar_width, b_at_rest, suffix, use_vector):
             plt.savefig(
                 os.path.join(
                     PLOT_DIR,
-                    "B0_Kstar_gamma_Kstar{}_{}_{}.png".format(
-                        suffix, tf_part.replace("*", "star"), coord_name
-                    ),
+                    "B0_Kstar_gamma_Kstar{}_{}_{}.png".format(suffix, tf_part.replace("*", "star"), coord_name),
                 )
             )
             plt.clf()
@@ -332,15 +310,11 @@ def run_k1_gamma(input_file, k1_width, kstar_width, b_at_rest, suffix):
     p_values = {}
     for ref_name, ref_part in rapidsim_parts.items():
         tf_part = name_matching[ref_name]
-        ref_part = (
-            ref_part.transpose()
-        )  # to be consistent with internal shape (nevents, nobs)
+        ref_part = ref_part.transpose()  # to be consistent with internal shape (nevents, nobs)
         for coord, coord_name in enumerate(("px", "py", "pz", "e")):
             range_ = (-3000 if coord % 4 != 3 else 0, 3000)
             ref_histo = make_norm_histo(ref_part[:, coord], range_=range_)
-            tf_histo = make_norm_histo(
-                particles[tf_part][:, coord], range_=range_, weights=norm_weights
-            )
+            tf_histo = make_norm_histo(particles[tf_part][:, coord], range_=range_, weights=norm_weights)
             plt.hist(
                 x if coord % 4 != 3 else e,
                 weights=tf_histo,
@@ -359,9 +333,7 @@ def run_k1_gamma(input_file, k1_width, kstar_width, b_at_rest, suffix):
             plt.savefig(
                 os.path.join(
                     PLOT_DIR,
-                    "Bp_K1_gamma_K1Kstar{}_{}_{}.png".format(
-                        suffix, tf_part.replace("*", "star"), coord_name
-                    ),
+                    "Bp_K1_gamma_K1Kstar{}_{}_{}.png".format(suffix, tf_part.replace("*", "star"), coord_name),
                 )
             )
             plt.clf()

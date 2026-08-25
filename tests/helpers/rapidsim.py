@@ -55,8 +55,7 @@ def load_generated_histos(file_name, particles):
     with uproot.open(file_name) as rapidsim_file:
         return {
             particle: [
-                rapidsim_file.get(f"{particle}_{coord}_TRUE").array(library="np")
-                for coord in ("PX", "PY", "PZ", "E")
+                rapidsim_file.get(f"{particle}_{coord}_TRUE").array(library="np") for coord in ("PX", "PY", "PZ", "E")
             ]
             for particle in particles
         }
@@ -68,10 +67,7 @@ def get_tree(file_name, top_particle, particles):
         tree = rapidsim_file["DecayTree"]
         return {
             particle: np.stack(
-                [
-                    1000.0 * tree[f"{particle}_{coord}_TRUE"].array(library="np")
-                    for coord in ("PX", "PY", "PZ", "E")
-                ]
+                [1000.0 * tree[f"{particle}_{coord}_TRUE"].array(library="np") for coord in ("PX", "PY", "PZ", "E")]
             )
             for particle in particles
         }
@@ -100,12 +96,9 @@ def get_tree_in_b_rest_frame(file_name, top_particle, particles):
             axis=0,
         )
 
-    part_dict = get_tree(file_name, top_particle, list(particles) + [top_particle])
+    part_dict = get_tree(file_name, top_particle, [*list(particles), top_particle])
     top_parts = part_dict.pop(top_particle)
-    return {
-        part_name: lorentz_boost(part, top_parts)
-        for part_name, part in part_dict.items()
-    }
+    return {part_name: lorentz_boost(part, top_parts) for part_name, part in part_dict.items()}
 
 
 # EOF

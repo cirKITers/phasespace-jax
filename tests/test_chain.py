@@ -11,11 +11,12 @@ import sys
 
 import numpy as np
 import pytest
+
 from phasespace import GenParticle
 
 sys.path.append(os.path.dirname(__file__))
 
-from .helpers import decays  # noqa: E402
+from .helpers import decays
 
 
 def test_name_clashes():
@@ -49,9 +50,7 @@ def test_name_clashes():
 def test_wrong_children():
     """Test wrong number of children."""
     with pytest.raises(ValueError):
-        GenParticle("Top", 0).set_children(
-            GenParticle("Kstarz0", mass=decays.KSTARZ_MASS)
-        )
+        GenParticle("Top", 0).set_children(GenParticle("Kstarz0", mass=decays.KSTARZ_MASS))
 
 
 def test_grandchildren():
@@ -118,14 +117,8 @@ def test_repr():
     """Test string representation."""
     b0 = decays.b0_to_kstar_gamma()
     kst = b0.children[0]
-    assert (
-        str(b0)
-        == "<phasespace.GenParticle: name='B0' mass=5279.58 children=[K*0, gamma]>"
-    )
-    assert (
-        str(kst)
-        == "<phasespace.GenParticle: name='K*0' mass=variable children=[K+, pi-]>"
-    )
+    assert str(b0) == "<phasespace.GenParticle: name='B0' mass=5279.58 children=[K*0, gamma]>"
+    assert str(kst) == "<phasespace.GenParticle: name='K*0' mass=variable children=[K+, pi-]>"
 
 
 if __name__ == "__main__":

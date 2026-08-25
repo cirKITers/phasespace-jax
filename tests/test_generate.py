@@ -10,12 +10,13 @@ import os
 import sys
 
 import numpy as np
-import phasespace
 import pytest
+
+import phasespace
 
 sys.path.append(os.path.dirname(__file__))
 
-from .helpers import decays  # noqa: E402
+from .helpers import decays
 
 B0_MASS = decays.B0_MASS
 PION_MASS = decays.PION_MASS
@@ -37,9 +38,7 @@ def test_one_event_tf(as_vectors):
     decay = phasespace.nbody_decay(B0_MASS, [PION_MASS, PION_MASS, PION_MASS])
     norm_weights, particles = decay.generate(n_events=1, as_vectors=as_vectors)
     if as_vectors:
-        particles = {
-            k: np.stack([p.px, p.py, p.pz, p.E], axis=-1) for k, p in particles.items()
-        }
+        particles = {k: np.stack([p.px, p.py, p.pz, p.E], axis=-1) for k, p in particles.items()}
 
     assert norm_weights.shape[0] == 1
     assert np.all(norm_weights < 1)
@@ -54,9 +53,7 @@ def test_n_events(n_events, as_vectors):
     decay = phasespace.nbody_decay(B0_MASS, [PION_MASS, PION_MASS, PION_MASS])
     norm_weights, particles = decay.generate(n_events=n_events, as_vectors=as_vectors)
     if as_vectors:
-        particles = {
-            k: np.stack([p.px, p.py, p.pz, p.E], axis=-1) for k, p in particles.items()
-        }
+        particles = {k: np.stack([p.px, p.py, p.pz, p.E], axis=-1) for k, p in particles.items()}
     assert norm_weights.shape[0] == n_events
     assert np.all(norm_weights < 1)
     assert len(particles) == 3
@@ -65,15 +62,11 @@ def test_n_events(n_events, as_vectors):
 
 def test_deterministic_events():
     decay = phasespace.nbody_decay(B0_MASS, [PION_MASS, PION_MASS, PION_MASS])
-    common_seed = 36
-    norm_weights_seeded1, particles_seeded1 = decay.generate(
-        n_events=100, seed=common_seed
-    )
+    common_key = 36
+    norm_weights_seeded1, particles_seeded1 = decay.generate(n_events=100, key=common_key)
     norm_weights_global, particles_global = decay.generate(n_events=100)
-    norm_weights_rnd, particles_rnd = decay.generate(n_events=100, seed=152)
-    norm_weights_seeded2, particles_seeded2 = decay.generate(
-        n_events=100, seed=common_seed
-    )
+    norm_weights_rnd, particles_rnd = decay.generate(n_events=100, key=152)
+    norm_weights_seeded2, particles_seeded2 = decay.generate(n_events=100, key=common_key)
 
     np.testing.assert_allclose(norm_weights_seeded1, norm_weights_seeded2)
     for part1, part2 in zip(particles_seeded1.values(), particles_seeded2.values()):

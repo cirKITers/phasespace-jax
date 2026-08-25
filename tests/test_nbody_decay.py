@@ -7,6 +7,7 @@
 """Test n-body decay generator."""
 
 import pytest
+
 from phasespace import nbody_decay
 
 from .helpers import decays
@@ -19,26 +20,20 @@ def test_no_names():
     """Test particle naming when no name is given."""
     decay = nbody_decay(B0_MASS, [PION_MASS, PION_MASS, PION_MASS])
     assert decay.name == "top"
-    assert all(
-        part.name == f"p_{part_num}" for part_num, part in enumerate(decay.children)
-    )
+    assert all(part.name == f"p_{part_num}" for part_num, part in enumerate(decay.children))
 
 
 def test_top_name():
     """Test particle naming when only top name is given."""
     decay = nbody_decay(B0_MASS, [PION_MASS, PION_MASS, PION_MASS], top_name="B0")
     assert decay.name == "B0"
-    assert all(
-        part.name == f"p_{part_num}" for part_num, part in enumerate(decay.children)
-    )
+    assert all(part.name == f"p_{part_num}" for part_num, part in enumerate(decay.children))
 
 
 def test_children_names():
     """Test particle naming when only children names are given."""
     children_names = [f"pion_{i}" for i in range(3)]
-    decay = nbody_decay(
-        B0_MASS, [PION_MASS, PION_MASS, PION_MASS], names=children_names
-    )
+    decay = nbody_decay(B0_MASS, [PION_MASS, PION_MASS, PION_MASS], names=children_names)
     assert decay.name == "top"
     assert children_names == [part.name for part in decay.children]
 
@@ -46,9 +41,7 @@ def test_children_names():
 def test_all_names():
     """Test particle naming when all names are given."""
     children_names = [f"pion_{i}" for i in range(3)]
-    decay = nbody_decay(
-        B0_MASS, [PION_MASS, PION_MASS, PION_MASS], top_name="B0", names=children_names
-    )
+    decay = nbody_decay(B0_MASS, [PION_MASS, PION_MASS, PION_MASS], top_name="B0", names=children_names)
     assert decay.name == "B0"
     assert children_names == [part.name for part in decay.children]
 
