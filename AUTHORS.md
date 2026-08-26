@@ -23,4 +23,4 @@ The original implementation is described in A. Puig Navarro and J. Eschle,
 
 ## This fork
 
-- Melvin Strobl <melvin.strobl@kit.edu> — port of the computational backend to JAX
+- Melvin Strobl <melvin.strobl@kit.edu>: port of the computational backend to JAX, GPU compatibility and general maintenance
