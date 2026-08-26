@@ -10,11 +10,12 @@ try:
 except PackageNotFoundError:
     pass
 
-__author__ = """Albert Puig Navarro"""
-__email__ = "apuignav@gmail.com"
-__maintainer__ = "Melvin Strobl <melvin.strobl@kit.edu>"
+__author__ = "Melvin Strobl"
+__email__ = "melvin.strobl@kit.edu"
 
+# Upstream zfit/phasespace authors, see AUTHORS.md
 __credits__ = [
+    "Albert Puig Navarro <albert.puig@cern.ch>",
     "Jonas Eschle <jonas.eschle@cern.ch>",
     "Simon Thor",
     "Eduardo Rodrigues <eduardo.rodrigues@cern.ch>",
