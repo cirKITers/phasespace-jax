@@ -36,8 +36,12 @@ jobs:
         run: uvx ruff check src tests benchmark data
       - name: Ruff format
         run: uvx ruff format --check src tests benchmark data
+      # ty resolves third-party imports from the project environment. Without one, every
+      # import is unknown, no type error fires and the `ty: ignore` comments report as unused.
+      - name: Install project
+        run: uv venv && uv pip install -e .[all]
       - name: Type check
-        run: uvx ty check src
+        run: uvx ty check src --python .venv
 
   download-data:
     runs-on: ubuntu-latest
