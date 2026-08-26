@@ -57,7 +57,7 @@ jobs:
         if: steps.cache-data.outputs.cache-hit != 'true'
         uses: actions/setup-python@v7
         with:
-          python-version: '3.10'
+          python-version: '3.12'
       - name: Install wget
         if: steps.cache-data.outputs.cache-hit != 'true'
         run: pip install wget
@@ -79,7 +79,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.10", "3.13"]
+        python-version: ["3.12", "3.13"]
         eager: [0, 1]
         include:
           - os: macos-latest  # Apple silicon runner

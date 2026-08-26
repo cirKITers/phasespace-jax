@@ -15,17 +15,15 @@ classifiers = [
     "Operating System :: Unix",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Physics",
 ]
 keywords = ["JAX", "phasespace", "HEP"]
 urls = { Homepage = "https://cirkiters.github.io/phasespace-jax/", Repository = "https://github.com/cirKITers/phasespace-jax", Documentation = "https://cirkiters.github.io/phasespace-jax/", Changelog = "https://cirkiters.github.io/phasespace-jax/changelog/" }
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
-    "jax>=0.8.0"
+    "jax>=0.11.0"
 ]
 dynamic = ["version"]
 

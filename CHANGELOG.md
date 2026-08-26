@@ -56,8 +56,9 @@ Entries up to and including 1.10.0 are the history of the upstream
   `ModuleNotFoundError`, which masked the intended message with a `TypeError`.
 
 ### Requirement changes
-- Requires `jax >= 0.4.35`. `tensorflow` and `tensorflow_probability` are no longer required,
+- Requires `jax >= 0.11.0`. `tensorflow` and `tensorflow_probability` are no longer required,
   and the `tf`/`tensorflow` extras were removed.
+- Requires Python >= 3.12, the floor of the jax 0.11 line. Support for 3.10 and 3.11 is dropped.
 - The `fromdecay` extra no longer requires `zfit` and `zfit-physics`.
 
 
