@@ -67,40 +67,6 @@ jobs:
           path: data/large
           retention-days: 1
 
-  codecov:
-    needs: download-data
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.10"]
-    steps:
-      - uses: actions/checkout@v7
-      - name: Download test data
-        uses: actions/download-artifact@v8
-        with:
-          name: test-data
-          path: data/large
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10
-        with:
-          enable-cache: true
-      - name: Install dependencies
-        run: |
-          sudo apt install graphviz -y
-          uv pip install -e .[dev] coverage --system
-      - name: Run pytest-cov
-        run: PYTHONPATH=src coverage run -m pytest
-      - name: Create XML report
-        run: coverage xml
-      - uses: codecov/codecov-action@v7
-        with:
-          file: ./coverage.xml
-
   pytest:
     needs: download-data
     runs-on: ${{ matrix.os }}
