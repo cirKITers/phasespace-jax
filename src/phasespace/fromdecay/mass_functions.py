@@ -7,7 +7,8 @@ and is usable inside jitted code.
 
 Sampling is done by inverse transform sampling (see e.g. L. Devroye, *Non-Uniform Random Variate
 Generation*, Springer 1986, Ch. II), analytically where a closed-form quantile function exists and
-on a precomputed grid for the relativistic Breit-Wigner, which has none.
+on a precomputed grid for the relativistic Breit-Wigner, which has none. A bounded rejection
+sampler covers nonnegative kinematic intervals that the table cannot resolve.
 """
 
 import jax
@@ -99,7 +100,8 @@ def relativistic_breitwigner_factory(mass, width):
         It has no closed-form quantile function, so the CDF is tabulated once here and inverted by
         interpolation. The grid is placed at the quantiles of the Cauchy distribution that the
         density takes in :math:`s = m^2`, which makes it dense across the peak while still reaching
-        far into the tails.
+        far into the tails. Intervals outside the table, or too narrow to resolve in its CDF,
+        use rejection sampling of the same density instead of clipping the requested limits.
     """
     particle_mass = float(mass)
     particle_width = float(width)
@@ -116,12 +118,51 @@ def relativistic_breitwigner_factory(mass, width):
     grid_cdf /= grid_cdf[-1]
     # kept as numpy: converting here would pin the dtype outside the caller's float64 scope
 
+    # Factor the denominator as ((x - a)**2 + b**2) * ((x + a)**2 + b**2),
+    # where a**2 - b**2 = m**2 and 2*a*b = m*width. A Cauchy(a, b) proposal
+    # truncated to [lo, hi] then has acceptance probability
+    # ((lo + a)**2 + b**2) / ((x + a)**2 + b**2) for nonnegative mass limits.
+    a = np.sqrt((np.hypot(particle_mass**2, particle_mass * particle_width) + particle_mass**2) / 2)
+    b = particle_mass * particle_width / (2 * a)
+
     def relbw(min_mass, max_mass, n_events, key):
+        # An independent fallback stream retains the existing in-table random draws.
+        tail_key = jax.random.fold_in(key, 1)
         uniform = jax.random.uniform(key, (n_events,), dtype=jnp.float64)
         cdf_low = jnp.interp(min_mass, grid_mass, grid_cdf)
         cdf_high = jnp.interp(max_mass, grid_mass, grid_cdf)
         quantile = cdf_low + uniform * (cdf_high - cdf_low)
-        return jnp.interp(quantile, grid_cdf, grid_mass)
+        sample = jnp.interp(quantile, grid_cdf, grid_mass)
+        outside = (min_mass < grid_mass[0]) | (max_mass > grid_mass[-1]) | (cdf_high <= cdf_low)
+        outside = jnp.broadcast_to(outside, sample.shape)
+
+        def sample_tail():
+            # Complementary Cauchy angles avoid subtracting CDF values close to one.
+            angle_low = jnp.arctan2(b, min_mass - a)
+            angle_high = jnp.arctan2(b, max_mass - a)
+            envelope = (min_mass + a) ** 2 + b**2
+
+            def draw(state):
+                key, selected_uniform, accepted = state
+                key, proposal_key, accept_key = jax.random.split(key, 3)
+                uniform = jax.random.uniform(proposal_key, (n_events,), dtype=jnp.float64)
+                angle = angle_low + uniform * (angle_high - angle_low)
+                proposal = jnp.clip(a + b / jnp.tan(angle), min_mass, max_mass)
+                accept = jax.random.uniform(accept_key, (n_events,), dtype=jnp.float64)
+                accept = accept * ((proposal + a) ** 2 + b**2) <= envelope
+                selected_uniform = jnp.where(~accepted & accept, uniform, selected_uniform)
+                return key, selected_uniform, accepted | accept
+
+            selected_uniform = jax.lax.while_loop(
+                lambda state: jnp.any(~state[2]), draw, (tail_key, uniform, ~outside)
+            )[1]
+            # The discrete acceptance decisions have no derivative. Evaluate the selected
+            # proposal outside the loop to retain derivatives with respect to the mass limits.
+            angle = angle_low + jax.lax.stop_gradient(selected_uniform) * (angle_high - angle_low)
+            proposal = jnp.clip(a + b / jnp.tan(angle), min_mass, max_mass)
+            return jnp.where(outside, proposal, sample)
+
+        return jax.lax.cond(jnp.any(outside), sample_tail, lambda: sample)
 
     return relbw
 
