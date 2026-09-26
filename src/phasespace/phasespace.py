@@ -346,7 +346,7 @@ class GenParticle:
         available_mass = top_mass - jnp.sum(masses, axis=1, keepdims=True)
         # Kinematically forbidden decays cannot raise from inside a jitted function; the flag is
         # propagated up and checked eagerly in `generate`.
-        allowed = jnp.all(available_mass >= 0.0)
+        allowed = jnp.all(available_mass > 0.0)
         # Calculate the max weight, initial beta, etc
         w_max = self._get_w_max(available_mass, masses)
         p_top_boost = kin.boost_components(p_top)
@@ -429,6 +429,9 @@ class GenParticle:
             )
             cos_y = jnp.cos(ang_y)
             sin_y = jnp.sin(ang_y)
+            # Materialize the shared rotation coefficients once per stage. Otherwise CPU fusion
+            # can repeat their transcendental evaluations for each outgoing momentum component.
+            cos_z, sin_z, cos_y, sin_y = jax.lax.optimization_barrier((cos_z, sin_z, cos_y, sin_y))
             # Do the rotations
             for j in range(part_num + 1):
                 px = kin.x_component(generated_particles[j])
@@ -457,11 +460,19 @@ class GenParticle:
                 )
             if part_num == (n_particles - 1):
                 break
-            betas = pds[part_num] / jnp.sqrt(jnp.square(pds[part_num]) + jnp.square(inv_masses[part_num]))
+            # The boost is along y. Use gamma = E/M and gamma*beta = p/M directly:
+            # recovering gamma from 1 - beta**2 loses precision for light intermediate systems.
+            gamma = jnp.sqrt(jnp.square(pds[part_num]) + jnp.square(inv_masses[part_num])) / inv_masses[part_num]
+            gamma_beta = pds[part_num] / inv_masses[part_num]
             generated_particles = [
-                kin.lorentz_boost(
-                    part,
-                    jnp.concatenate([zero_component, betas, zero_component], axis=1),
+                jnp.concatenate(
+                    [
+                        kin.x_component(part),
+                        gamma * kin.y_component(part) + gamma_beta * kin.time_component(part),
+                        kin.z_component(part),
+                        gamma * kin.time_component(part) + gamma_beta * kin.y_component(part),
+                    ],
+                    axis=1,
                 )
                 for part in generated_particles
             ]
@@ -647,8 +658,9 @@ class GenParticle:
             Chunking changes which events are drawn, as every chunk consumes its own split of
             ``key``: ``generate(n, key=k)`` and ``generate(n, key=k, chunk_size=c)`` give different
             but equally valid samples, each of them reproducible. It bounds the memory of the
-            generation itself, not of the returned arrays, and keeps the number of compilations at
-            two (a full chunk and the remainder) whatever ``n_events`` is.
+            generation itself, not of the returned arrays. Each call uses at most two event-count
+            specializations (a full chunk and its remainder); different remainder sizes across
+            calls can require additional compilations.
 
         Args:
             n_events (int): Number of events to generate.
@@ -677,7 +689,7 @@ class GenParticle:
                   ``(n_events, 4)`` with particle names as keys.
 
         Raises:
-            ValueError: If the decay is kinematically forbidden, if ``n_events`` and the size of
+            ValueError: If the decay has no positive available phase space, if ``n_events`` and the size of
                 ``boost_to`` don't match or if ``chunk_size`` is not positive.
         """
         key = ensure_key(key)
@@ -728,7 +740,7 @@ class GenParticle:
                 key=key,
             )
             if not bool(allowed):
-                raise ValueError("Forbidden decay")
+                raise ValueError("Forbidden decay: no positive available phase space")
         parts = to_vectors(parts) if as_vectors else parts
         # `parts` holds vector.Momentum objects when as_vectors is set
         if normalize_weights:
