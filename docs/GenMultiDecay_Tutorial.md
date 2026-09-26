@@ -1,13 +1,13 @@
 <!-- Generated from GenMultiDecay_Tutorial.ipynb. Edit the notebook, not this file. -->
 
-# Tutorial for *GenMultiDecay* class
-This tutorial shows how `phasespace.fromdecay.GenMultiDecay` can be used.
+# Tutorial for the *GenMultiDecay* class
+`phasespace.fromdecay.GenMultiDecay` generates events from decay chains with multiple decay modes.
 
-In order to use this functionality, you need to install the extra dependencies, for example through
+Install the optional dependencies with
 `pip install phasespace-jax[fromdecay]`.
 
-This submodule makes it possible for `phasespace` and [`DecayLanguage`](https://github.com/scikit-hep/decaylanguage/) to work together.
-More generally, `GenMultiDecay` can also be used as a high-level interface for simulating particles that can decay in multiple different ways.
+The `fromdecay` submodule connects `phasespace` with [`DecayLanguage`](https://github.com/scikit-hep/decaylanguage/).
+`GenMultiDecay` also provides an interface for particles with several decay modes.
 
 ```python
 # Import libraries
@@ -21,30 +21,30 @@ from decaylanguage import DecFileParser, DecayChainViewer, DecayChain, DecayMode
 from phasespace.fromdecay import GenMultiDecay
 ```
 
-## Quick Intro to DecayLanguage
-DecayLanguage can be used to parse and view .dec files. These files contain information about how a particle decays and with which probability. For more information about DecayLanguage and .dec files, see the [DecayLanguage](https://github.com/scikit-hep/decaylanguage) documentation.
+## Introduction to DecayLanguage
+DecayLanguage parses and displays `.dec` files, which define particle decay modes and their branching fractions. For details, see the [DecayLanguage documentation](https://github.com/scikit-hep/decaylanguage).
 
-We will begin by parsing a .dec file using DecayLanguage:
+First, parse a `.dec` file:
 
 ```python
 parser = DecFileParser("../tests/fromdecay/example_decays.dec")
 parser.parse()
 ```
 
-From the `parser` variable, one can access a certain decay for a particle using `parser.build_decay_chains`. This will be a `dict` that contains all information about how the mother particle, daughter particles etc. decay.
+Use `parser.build_decay_chains` to obtain a dictionary describing the selected particle and its descendants:
 
 ```python
 pi0_chain = parser.build_decay_chains("pi0")
 pprint(pi0_chain)
 ```
 
-This `dict` can also be displayed in a more human-readable way using `DecayChainViewer`:
+`DecayChainViewer` displays the decay chain as a diagram:
 
 ```python
 DecayChainViewer(pi0_chain)
 ```
 
-You can also create a decay using the `DecayChain` and `DecayMode` classes. However, a DecayChain can only contain one chain, i.e., a particle cannot decay in multiple ways.
+Alternatively, construct a decay chain with `DecayChain` and `DecayMode`. The following example specifies one decay mode for each decaying particle:
 
 ```python
 dplus_decay = DecayMode(1, "K- pi+ pi+ pi0", model="PHSP")
@@ -54,15 +54,15 @@ DecayChainViewer(dplus_single.to_dict())
 ```
 
 ## Creating a GenMultiDecay object
-A regular `phasespace.GenParticle` instance would not be able to simulate this decay, since the $\pi^0$ particle can decay in four different ways. However, a `GenMultiDecay` object can be created directly from a DecayLanguage dict:
+The parsed chain contains four decay modes for $\pi^0$. Create a `GenMultiDecay` object from its DecayLanguage dictionary to sample among those modes:
 
 ```python
 pi0_decay = GenMultiDecay.from_dict(pi0_chain)
 ```
 
-When creating a `GenMultiDecay` object, the DecayLanguage dict is "unpacked" into separate GenParticle instances, where each GenParticle instance corresponds to one way that the particle can decay.
+`GenMultiDecay.from_dict` converts each complete decay path into a separate `GenParticle` instance.
 
-These GenParticle instances and the probabilities of that decay mode can be accessed via `GenMultiDecay.gen_particles`. This is a list of tuples, where the first element in the tuple is the probability and the second element is the GenParticle.
+The `gen_particles` attribute stores these instances as `(probability, GenParticle)` pairs:
 
 ```python
 for probability, particle in pi0_decay.gen_particles:
@@ -72,26 +72,24 @@ for probability, particle in pi0_decay.gen_particles:
     )
 ```
 
-One can simulate this decay using the `.generate` method, which works the same as the `GenParticle.generate` method.
+Call `generate` to sample events across the available decay paths.
 
-When calling the `GenMultiDecay.generate` method, it internally calls the generate method on the of the GenParticle instances in `GenMultiDecay.gen_particles`. The outputs are placed in a list, which is returned.
+The method draws a decay path for each event, generates events for each selected path and returns lists of weights and particle momenta. Paths with zero selected events are omitted.
 
 ```python
 weights, events = pi0_decay.generate(n_events=10_000)
 print("Number of events for each decay mode:", ", ".join(str(len(w)) for w in weights))
 ```
 
-We can confirm that the counts above are close to the expected counts based on the probabilities.
+The event counts should approximately follow the listed probabilities.
 
 ## Changing mass settings
-Since DecayLanguage dicts do not contain any information about the mass of a particle, the `fromdecay` submodule uses the [particle](https://github.com/scikit-hep/particle) package to find the mass of a particle based on its name.
-The mass can either be a constant value or a function (besides the top particle, which is always a constant).
-These settings can be modified by passing in additional parameters to `GenMultiDecay.from_dict`.
-There are two optional parameters that can be passed to `GenMultiDecay.from_dict`: `tolerance` and `mass_converter`.
+DecayLanguage dictionaries do not specify particle masses. Therefore, `fromdecay` looks up masses by particle name using the [particle](https://github.com/scikit-hep/particle) package.
+It assigns a fixed mass or a mass function to each particle; the top particle always has a fixed mass.
+The optional `tolerance`, `mass_converter` and `particle_model_map` arguments to `GenMultiDecay.from_dict` control this behavior.
 
-### Constant vs variable mass
-If a particle has a width less than `tolerance`, its mass is set to a constant value.
-This will be demonsttrated with the decay below:
+### Fixed and variable masses
+A decaying particle receives a fixed mass when its width is at most `tolerance`. The following decay illustrates this rule:
 
 ```python
 dsplus_chain = parser.build_decay_chains("D*+", stable_particles=["D+"])
@@ -106,7 +104,7 @@ print(
 ```
 
 $\pi^0$ has a greater width than $D^0$.
-If the tolerance is set to a value between their widths, the $D^0$ particle will have a constant mass while $\pi^0$ will not.
+A tolerance between their widths therefore assigns a fixed mass to $D^0$ and a variable mass to $\pi^0$.
 
 ```python
 dstar_decay = GenMultiDecay.from_dict(dsplus_chain, tolerance=1e-8)
@@ -122,7 +120,7 @@ for particle in dstar_decay.gen_particles[1][1].children:
 ```
 
 ### Configuring mass functions
-By default, the mass function used for variable mass is the relativistic Breit-Wigner distribution. This can however be changed. If you want the mother particle to have a specific mass function for a specific decay, you can add a `zfit` parameter to the DecayLanguage dict. Consider for example the previous $D^{*+}$ example:
+Variable masses use a relativistic Breit-Wigner distribution by default. To select a different function for one decay mode, add a `zfit` field to that mode in the DecayLanguage dictionary. For example, in the preceding $D^{*+}$ chain:
 
 ```python
 dsplus_custom_mass_func = dsplus_chain.copy()
@@ -135,13 +133,13 @@ print("After:")
 pprint(dsplus_chain_subset)
 ```
 
-Notice the added `zfit` field to the first decay mode of the $\pi^0$ particle. This dict can then be passed to `GenMultiDecay.from_dict`, like before.
+The added `zfit` field selects a Gaussian mass function for the first $\pi^0$ decay mode. Pass the modified dictionary to `GenMultiDecay.from_dict`:
 
 ```python
 GenMultiDecay.from_dict(dsplus_custom_mass_func)
 ```
 
-If you want all $\pi^0$ particles to decay with the same mass function, you do not need to specify the `zfit` parameter for each decay in the `dict`. Instead, one can pass the `particle_model_map` parameter to the constructor:
+To assign the same mass function to every $\pi^0$ decay mode, pass `particle_model_map` to `from_dict`:
 
 ```python
 GenMultiDecay.from_dict(
@@ -149,7 +147,7 @@ GenMultiDecay.from_dict(
 )  # pi0 always decays with a gaussian mass distribution.
 ```
 
-When using `DecayChain`s, the syntax for specifying the mass function becomes cleaner:
+With `DecayChain`, specify the function directly in a `DecayMode`:
 
 ```python
 dplus_decay = DecayMode(
@@ -163,11 +161,11 @@ GenMultiDecay.from_dict(dplus_single.to_dict())
 ```
 
 #### Custom mass functions
-The built-in supported mass function names are `gauss`, `bw`, and `relbw`, with `gauss` being the gaussian distribution, `bw` being the Breit-Wigner distribution, and `relbw` being the relativistic Breit-Wigner distribution.
+The built-in mass function names are `gauss` (Gaussian), `bw` (Breit-Wigner) and `relbw` (relativistic Breit-Wigner).
 
-If a non-supported value for the `zfit` parameter is not specified, it will automatically use the relativistic Breit-Wigner distribution. This behavior can be changed by changing the value of `GenMultiDecay.DEFAULT_MASS_FUNC` to a different string, e.g., `"gauss"`. If an invalid value for the `zfit` parameter is used, a `KeyError` is raised.
+If neither `zfit` nor `particle_model_map` selects a function, `relbw` is used. Change `GenMultiDecay.DEFAULT_MASS_FUNC` to select another default, such as `"gauss"`. An unknown function name raises `KeyError`.
 
-It is also possible to add your own mass functions besides the built-in ones. You should then create a function that takes the mass and width of a particle and returns a mass function which with the [format](https://cirkiters.github.io/phasespace-jax/usage/#resonances-with-variable-mass) that is used for all phasespace mass functions. Below is an example of a custom gaussian distribution, implemented in the same way as the built-in one:
+To add a mass function, define a factory that accepts a particle's mass and width and returns a function with the required [sampling signature](https://cirkiters.github.io/phasespace-jax/usage/#resonances-with-variable-mass). For example:
 
 ```python
 def custom_gauss(mass, width):
@@ -186,7 +184,7 @@ def custom_gauss(mass, width):
     return mass_func
 ```
 
-This function can then be passed to `GenMultiDecay.from_dict` as a dict, where the key specifies the `zfit` parameter name. In the example below, it is set to `"custom_gauss"`. However, this name can be chosen arbitrarily and does not need to be the same as the function name.
+Pass the factory through `mass_converter`, keyed by the name used in `zfit`. The key can be any name; here it is `"custom_gauss"`:
 
 ```python
 dsplus_chain_subset = dsplus_custom_mass_func["D*+"][1]["fs"][1]
