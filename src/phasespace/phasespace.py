@@ -138,7 +138,7 @@ class GenParticle:
             @functools.wraps(mass)
             def mass_preprocessed(*args, mass=mass, **kwargs):
                 return jnp.atleast_1d(
-                    jnp.asarray(mass(*args, **kwargs), dtype=jnp.float64)  # ty: ignore[call-top-callable]
+                    jnp.asarray(mass(*args, **kwargs), dtype=jnp.float64)
                 )
         else:
             mass_preprocessed = jnp.atleast_1d(jnp.asarray(mass, dtype=jnp.float64))
