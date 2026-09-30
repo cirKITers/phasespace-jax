@@ -12,7 +12,6 @@ import subprocess
 import numpy as np
 import pytest
 import vector
-from scipy.stats import ks_2samp
 
 if platform.system() == "Darwin":
     import matplotlib
@@ -31,6 +30,7 @@ sys.path.append(os.path.dirname(__file__))
 
 from .helpers import decays, rapidsim
 from .helpers.plotting import make_norm_histo
+from .helpers.statistics import histogram_pvalue
 
 BASE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 PLOT_DIR = os.path.join(BASE_PATH, "tests", "plots")
@@ -54,14 +54,16 @@ def create_ref_histos(n_pions):
     events = uproot.open(ref_file)["events"]
     pion_names = [f"pion_{pion + 1}" for pion in range(n_pions)]
     pions = {pion_name: events[pion_name] for pion_name in pion_names}
-    weights = events["weight"]
+    weights = events["weight"].array(library="np")
     normalized_histograms = []
+    samples = []
     for pion in pions.values():
         pion_array = pion.array()
         energy = pion_array.fE
         momentum = pion_array.fP
         for coord, array in enumerate([momentum.fX, momentum.fY, momentum.fZ, energy]):
             numpy_array = np.array(array)
+            samples.append(numpy_array)
             histogram = make_norm_histo(
                 numpy_array,
                 range_=(-3000 if coord % 4 != 3 else 0, 3000),
@@ -69,7 +71,7 @@ def create_ref_histos(n_pions):
             )
             normalized_histograms.append(histogram)
 
-    return normalized_histograms, make_norm_histo(weights, range_=(0, 1 + 1e-8))
+    return normalized_histograms, make_norm_histo(weights, range_=(0, 1 + 1e-8)), samples, weights
 
 
 def run_test(n_particles, test_prefix):
@@ -92,10 +94,19 @@ def run_test(n_particles, test_prefix):
         for coord in range(parts.shape[1])
     ]
     weight_histos = make_norm_histo(weights, range_=(0, 1 + 1e-8))
-    ref_histos, ref_weights = create_ref_histos(n_particles)
+    ref_histos, ref_weights, ref_samples, ref_event_weights = create_ref_histos(n_particles)
     p_values = np.array(
-        [ks_2samp(histos[coord], ref_histos[coord])[1] for coord, _ in enumerate(histos)]
-        + [ks_2samp(weight_histos, ref_weights)[1]]
+        [
+            histogram_pvalue(
+                parts[:, coord],
+                ref_samples[coord],
+                range_=(-3000 if coord % 4 != 3 else 0, 3000),
+                weights_first=weights,
+                weights_second=ref_event_weights,
+            )
+            for coord, _ in enumerate(histos)
+        ]
+        + [histogram_pvalue(weights, ref_event_weights, range_=(0, 1 + 1e-8))]
     )
     # Let's plot
     x = np.linspace(-3000, 3000, 100)
@@ -141,7 +152,8 @@ def run_test(n_particles, test_prefix):
     )
     plt.savefig(os.path.join(PLOT_DIR, f"{test_prefix}_weights.png"))
     plt.clf()
-    assert np.all(p_values > 0.05)
+    # Bonferroni correction: 5% significance for the collection of coordinate/weight checks.
+    assert np.all(p_values > 0.05 / len(p_values)), p_values
 
 
 @pytest.mark.flaky(3)  # Stats are limited
@@ -223,7 +235,9 @@ def run_kstargamma(input_file, kstar_width, b_at_rest, suffix, use_vector):
                 )
             )
             plt.clf()
-            p_values[(tf_part, coord_name)] = ks_2samp(tf_histo, ref_histo)[1]
+            p_values[(tf_part, coord_name)] = histogram_pvalue(
+                particles[tf_part][:, coord], ref_part[:, coord], range_=range_, weights_first=norm_weights
+            )
     plt.hist(
         np.linspace(0, 1, 100),
         weights=make_norm_histo(norm_weights, range_=(0, 1)),
@@ -245,7 +259,7 @@ def test_kstargamma_kstarnonresonant_at_rest(vector):
         "NonResonant",
         use_vector=vector,
     )
-    assert np.all(p_values > 0.05)
+    assert np.all(p_values > 0.05 / len(p_values)), p_values
 
 
 @pytest.mark.parametrize("vector", [False, True], ids=["no_vector", "vector"])
@@ -259,7 +273,7 @@ def test_kstargamma_kstarnonresonant_lhc(vector):
         "NonResonant_LHC",
         use_vector=vector,
     )
-    assert np.all(p_values > 0.05)
+    assert np.all(p_values > 0.05 / len(p_values)), p_values
 
 
 def test_kstargamma_resonant_at_rest():
@@ -337,7 +351,9 @@ def run_k1_gamma(input_file, k1_width, kstar_width, b_at_rest, suffix):
                 )
             )
             plt.clf()
-            p_values[(tf_part, coord_name)] = ks_2samp(tf_histo, ref_histo)[1]
+            p_values[(tf_part, coord_name)] = histogram_pvalue(
+                particles[tf_part][:, coord], ref_part[:, coord], range_=range_, weights_first=norm_weights
+            )
     plt.hist(
         np.linspace(0, 1, 100),
         weights=make_norm_histo(norm_weights, range_=(0, 1)),
@@ -358,7 +374,7 @@ def test_k1gamma_kstarnonresonant_at_rest():
         True,
         "NonResonant",
     )
-    assert np.all(p_values > 0.05)
+    assert np.all(p_values > 0.05 / len(p_values)), p_values
 
 
 @pytest.mark.flaky(3)  # Stats are limited
@@ -371,7 +387,7 @@ def test_k1gamma_kstarnonresonant_lhc():
         False,
         "NonResonant_LHC",
     )
-    assert np.all(p_values > 0.05)
+    assert np.all(p_values > 0.05 / len(p_values)), p_values
 
 
 def test_k1gamma_resonant_at_rest():

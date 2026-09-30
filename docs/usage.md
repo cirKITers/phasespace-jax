@@ -1,29 +1,25 @@
 # Usage
 
-The base of `phasespace` is the `GenParticle` object. This object, which represents a particle,
-either stable or decaying, has only one mandatory argument, its name.
-
-In most cases (except for the top particle of a decay), one wants to also specify its mass, which
-can either be array-like, or a function. Functions are used to specify the mass of particles such
-as resonances, which are not fixed but vary according to a broad distribution. These mass functions
-get four arguments and must return an array-like object of shape `(n_events,)`:
+`GenParticle` represents a stable or decaying particle and requires a name and mass. The mass
+can be an array-like value or a function. A mass function describes a variable mass, such as
+that of a resonance. It takes four arguments and returns an array-like object of shape
+`(n_events,)`:
 
 - The minimum mass allowed by the decay chain, of shape `(n_events,)`.
 - The maximum mass available, of shape `(n_events,)`.
 - The number of events to generate.
 - A JAX PRNG key.
 
-This function signature allows to handle threshold effects cleanly, giving enough information to
-produce kinematically allowed decays.
+The mass bounds allow the function to account for thresholds and sample kinematically allowed
+values.
 
 !!! note
     `phasespace` raises a `ValueError` if a kinematically forbidden decay is requested.
 
 ## A simple example
 
-With these considerations in mind, one can build a decay chain by using the `set_children` method
-of the `GenParticle` class. As an example, to build the $B^{0}\to K^{*}\gamma$ decay in which
-$K^*\to K\pi$ with a fixed mass, one would write:
+Use `GenParticle.set_children` to build a decay chain. For example, the following chain describes
+$B^{0}\to K^{*}\gamma$ followed by $K^*\to K\pi$, with a fixed $K^*$ mass:
 
 ```python
 from phasespace import GenParticle
@@ -43,13 +39,11 @@ gamma = GenParticle('gamma', 0)
 bz = GenParticle('B0', B0_MASS).set_children(kstar, gamma)
 ```
 
-Phase space events can be generated using the `generate` method, which gets the number of events to
-generate as input. The method returns:
+Call `generate` with the desired number of events. It returns:
 
-- The normalized weights of each event, as an array of dimension `(n_events,)`.
-- The 4-momenta of the generated particles as values of a dictionary with the particle name as key.
-  These momenta are *either* expressed as arrays of dimension `(n_events, 4)` or `vector.Momentum`
-  objects, depending on the `as_vectors` flag given to `generate`.
+- Normalized event weights as an array of shape `(n_events,)`.
+- A dictionary keyed by particle name. Its values are four-momenta represented as arrays of shape
+  `(n_events, 4)` or as `vector.Momentum` objects, according to the `as_vectors` argument.
 
 ```python
 N_EVENTS = 1000
@@ -59,19 +53,18 @@ weights, particles = bz.generate(n_events=N_EVENTS, as_vectors=True)
 weights, particles = bz.generate(n_events=N_EVENTS)
 ```
 
-JAX arrays can always be converted to a numpy array (if really needed) through `np.asarray(obj)`.
+Convert JAX arrays to NumPy arrays with `np.asarray(obj)` when needed.
 
 ## Boosting the particles
 
-The particles are generated in the rest frame of the top particle. To produce them at a given
-momentum of the top particle, one can pass these momenta with the `boost_to` argument in
-`generate`. This latter approach can be useful if the momentum of the top particle is generated
-according to some distribution, for example the kinematics of the LHC (see
-`test_kstargamma_kstarnonresonant_lhc` and `test_k1gamma_kstarnonresonant_lhc` in
-`tests/test_physics.py` to see how this could be done).
+Particles are generated in the rest frame of the parent at the top of the chain. Pass its
+four-momentum through `boost_to` to generate events in another frame. For an example with a
+distribution of parent momenta, see `test_kstargamma_kstarnonresonant_lhc` and
+`test_k1gamma_kstarnonresonant_lhc` in `tests/test_physics.py`.
 
-The `boost_to` argument can be a 4-momentum array of shape `(n_events, 4)` with
-`(px, py, pz, energy)` or a `vector.Momentum` (both a momentum and a Lorentz vector).
+`boost_to` accepts a four-momentum array with components `(px, py, pz, energy)` or a
+`vector.Momentum` object. An array can have shape `(n_events, 4)` to specify one momentum per
+event.
 
 ```python
 N_EVENTS = 1000
@@ -85,11 +78,10 @@ weights, particles = bz.generate(n_events=N_EVENTS, boost_to=top_momentum)
 
 ## Weights
 
-Additionally, it is possible to obtain the unnormalized weights by using the
-`generate_unnormalized` flag in `generate`. In this case, the method returns the unnormalized
-weights, the per-event maximum weight and the particle dictionary.
+Set `generate_unnormalized` in `generate` to obtain unnormalized weights. The method then returns
+the weights, the per-event maximum weight and the particle dictionary.
 
-Iterative generation can be performed using normal python loops without loss in performance:
+Repeated generation can use ordinary Python loops:
 
 ```python
 for i in range(5):
@@ -101,20 +93,18 @@ for i in range(5):
 
 ## Resonances with variable mass
 
-To generate the mass of a resonance, we need to give a function as its mass instead of a floating
-number. This function is called as `mass(min_mass, max_mass, n_events, key)`: the per-event lower
-mass allowed, the per-event upper mass allowed, the number of events and a JAX PRNG key. It should
-return an array-like object with the generated masses and shape `(n_events,)`, and has to be
-jit-compatible, i.e. written with
+To sample resonance masses, supply a mass function in place of a fixed value. It receives
+`mass(min_mass, max_mass, n_events, key)`: per-event lower and upper mass bounds, the number of
+events and a JAX PRNG key. It must return an array-like object of shape `(n_events,)` and be
+compatible with `jax.jit`, using
 [jax.numpy](https://docs.jax.dev/en/latest/jax.numpy.html) and
 [jax.random](https://docs.jax.dev/en/latest/jax.random.html).
 
 Ready-made mass shapes for resonances (Gaussian, Breit-Wigner and relativistic Breit-Wigner) are
 available in [`phasespace.fromdecay.mass_functions`](api.md#phasespacefromdecay).
 
-Following with the same example as above, and approximating the resonance shape by a gaussian, we
-could write the $B^{0}\to K^{*}\gamma$ decay chain as (more details can be found in
-`tests/helpers/decays.py`):
+For the preceding example, a Gaussian approximation to the resonance mass gives the following
+$B^{0}\to K^{*}\gamma$ chain. See `tests/helpers/decays.py` for more examples.
 
 ```python
 import jax
@@ -144,16 +134,15 @@ bz.generate(n_events=500)
 
 ## Shortcut for simple decays
 
-The generation of simple $n$-body decay chains can be done using the `nbody_decay` function of
-`phasespace`, which takes
+For a simple $n$-body decay, `phasespace.nbody_decay` takes:
 
 - The mass of the top particle.
-- The mass of children particles as a list.
+- A list of daughter masses.
 - The name of the top particle (optional).
-- The names of the children particles (optional).
+- The names of the daughter particles (optional).
 
-If the names are not given, `top` and `p_{i}` are assigned. For example, to generate
-$B^0\to K\pi$, one would do:
+If names are omitted, the function assigns `top` to the parent and `p_{i}` to the daughters. For
+example, to generate $B^0\to K\pi$:
 
 ```python
 import phasespace
@@ -170,51 +159,55 @@ decay = phasespace.nbody_decay(B0_MASS, [PION_MASS, KAON_MASS],
 weights, particles = decay.generate(n_events=N_EVENTS)
 ```
 
-In this example, `decay` is simply a `GenParticle` with the corresponding children.
+Here, `decay` is a `GenParticle` with the specified daughters.
 
 ## Eager execution
 
-By default, `phasespace` uses JIT (*just-in-time*) compilation with `jax.jit` to greatly speed up
-the generation of events. Simplified, this means that the first time a decay is generated, a
-symbolic array *without a concrete value* is used and the computation is compiled. As a user
-calling the function, you will not notice this, the output will be the same as if the function was
-executed eagerly. The consequence is two-fold: on one hand the initial overhead is higher with a
-significant speedup for subsequent generations, on the other hand, the values of the generated
-particles *inside the function* are not available in pure Python (e.g. for debugging basically).
+By default, `phasespace` compiles generation with `jax.jit`. On the first call, JAX traces the
+computation with abstract arrays and compiles it. This incurs an initial cost, while later calls
+can reuse the compiled computation. Traced values are unavailable to ordinary Python debugging
+code inside the function.
 
-The number of events is a *static* argument of the compiled function: generating with a new
-`n_events` recompiles, while repeated calls with the same value reuse the compiled function. Prefer
-therefore to generate repeatedly with the same number of events.
+The number of events is a *static* argument: a new `n_events` value triggers compilation, whereas
+repeated calls with the same value reuse the compiled function. Reusing event counts therefore
+avoids additional compilation.
 
-If you need to debug the internals, using `jax.disable_jit` (or the environment variable
-`PHASESPACE_EAGER=1`) will make everything run numpy-like.
+For debugging, use `jax.disable_jit()` or set `PHASESPACE_EAGER=1` to run eagerly.
 
 ## Double precision
 
-The phase space computation is not numerically stable in single precision: `pdk` suffers
-catastrophic cancellation close to threshold, which degrades energy-momentum conservation from
-~1e-15 to ~1e-6 relative. `generate` therefore enables the double precision mode of JAX, which is
-off by default, for the duration of the call and always returns `float64` arrays. Importing
-`phasespace` does not change any global JAX setting.
+Phase space generation requires double precision for numerical stability. Near threshold,
+catastrophic cancellation in `pdk` degrades relative energy-momentum conservation from about
+1e-15 to 1e-6 in single precision. Therefore, `generate` enables JAX's double precision mode
+for the duration of the call and returns `float64` arrays. Importing `phasespace` leaves the
+global JAX setting unchanged.
 
-JAX only keeps 64-bit values while x64 mode is on, so if your program leaves it off, further *JAX*
-operations on the returned arrays downcast them to `float32` and warn. Converting to numpy with
-`np.asarray` preserves the full precision; if you keep computing in JAX, enable the mode for your
-program with `jax.config.update("jax_enable_x64", True)`.
+When x64 mode is disabled, subsequent JAX operations may downcast the returned arrays to
+`float32` and issue a warning. Conversion with `np.asarray` preserves their precision. For
+subsequent JAX calculations, enable x64 with `jax.config.update("jax_enable_x64", True)`.
 
-The helpers in [`phasespace.kinematics`][phasespace.kinematics] deliberately follow the precision
-of their caller instead of forcing their own, so that they stay composable with `jax.jit`. Use them
-under x64.
+The helpers in [`phasespace.kinematics`][phasespace.kinematics] follow the caller's precision so
+they remain compatible with `jax.jit`. Use them with x64 enabled for double precision.
+
+Decays require positive available phase space. At the exact threshold, the phase-space volume and
+maximum weight are zero, so generation raises `ValueError`. Boosts support batches containing
+both stationary and moving parents. Internal boosts use the known invariant mass directly to
+preserve precision for light intermediate systems.
+
+Rotation coefficients are shared across particles through a
+[JAX optimization barrier](https://docs.jax.dev/en/latest/_autosummary/jax.lax.optimization_barrier.html).
+This avoids repeated transcendental evaluations in compiled CPU kernels. The performance benefit
+depends on event count, hardware and compiler; random draws and precision are unchanged.
 
 ## Running on a GPU
 
-All that is needed is a CUDA-enabled `jaxlib`, depending on the CUDA version supported by the GPU:
+Install a JAX build compatible with your CUDA version, for example:
 
 ```bash
 pip install "jax[cuda13]"
 ```
 
-`phasespace` deliberately has no device API of its own, since JAX already provides one:
+JAX provides device selection for `phasespace`:
 
 ```python
 import jax
@@ -225,55 +218,50 @@ with jax.default_device(jax.devices("gpu")[0]):
     weights, particles = bz.generate(n_events=10_000, key=42)
 ```
 
-`JAX_PLATFORMS=cuda` or `JAX_PLATFORMS=cpu` picks the backend for a whole run instead. Note
-that it *restricts* JAX to that one backend rather than just choosing a default, so
-`jax.devices("cpu")` raises `RuntimeError` under `JAX_PLATFORMS=cuda`. Leave it unset if you
-want to reach both backends from one process.
+Alternatively, `JAX_PLATFORMS=cuda` or `JAX_PLATFORMS=cpu` selects a backend for the whole run.
+This setting restricts JAX to the selected backend: for example, `jax.devices("cpu")` raises
+`RuntimeError` under `JAX_PLATFORMS=cuda`. Leave it unset to access both backends in one process.
 
-Note that the computation is mostly memory-bandwidth-bound rather than FLOP-bound/
-Measure your own card with `benchmark/bench_phasespace.py`.
+The computation is primarily limited by memory bandwidth. Measure performance on your device
+with `benchmark/bench_phasespace.py`.
 
-Results are not bit-identical between CPU and GPU.
-The PRNG is, being backend-independent by construction, but the arithmetic differs
-by a few ULP per operation.
+CPU and GPU results can differ by a few units in the last place (ULPs) because their arithmetic
+differs. The PRNG produces the same draws on both backends.
 
 ### Memory
 
-An event costs 32 bytes per particle, four `float64` components, plus 8 bytes for its weight.
-Generating 10 million `B -> 3pi` events returns 0.97 GiB and peaks at 3.2 GiB on the device, so
-budget approximately three times the size of the result. When a run does not fit, `chunk_size`
-generates it in pieces:
+Each event requires 32 bytes per particle for four `float64` components, plus 8 bytes for its
+weight. Generating 10 million `B -> 3pi` events returns 0.97 GiB of data and peaks at 3.2 GiB of
+device memory. Budget approximately three times the result size. If generation exceeds available
+memory, use `chunk_size` to divide it into batches:
 
 ```python
 weights, particles = bz.generate(n_events=10_000_000, key=42, chunk_size=1_000_000)
 ```
 
-The same 10 million events then peak at 2.1 GiB instead of 3.2 GiB. Note that this bounds the
-memory of the *generation*, not of the returned arrays: the chunks and the array they are
-concatenated into are both live at the end, so the floor is about twice the size of the result
-however small the chunks are. If the result itself does not fit, consume the chunks yourself.
+For the same 10 million events, peak memory falls to 2.1 GiB. Chunking bounds the memory used
+during generation, but the chunks and concatenated result coexist at the end. Consequently, peak
+memory remains at least about twice the result size, regardless of chunk size. If the result
+itself does not fit, consume chunks separately.
 
-Each chunk consumes its own split of `key`, so a chunked run draws a different sample than an
-unchunked one with the same key. Both are equally valid and equally reproducible. As a side effect
-chunking also bounds recompilation, since a fixed `chunk_size` means at most two compiled
-functions, a full chunk and the remainder, whatever `n_events` is.
+Each chunk receives a separate split of `key`. Thus, chunked and unchunked runs with the same
+key draw different samples, although both remain reproducible. Within one call, generation uses
+at most two event-count specializations: the full chunk and the remainder. Across calls with
+different totals, each distinct remainder size can require another compilation.
 
-XLA preallocates 75% of the GPU memory on the first computation. If you share the card,
-`XLA_PYTHON_CLIENT_PREALLOCATE=false` or `XLA_PYTHON_CLIENT_MEM_FRACTION=.5` keeps it in check.
+XLA preallocates 75% of GPU memory on the first computation. On a shared GPU, set
+`XLA_PYTHON_CLIENT_PREALLOCATE=false` or `XLA_PYTHON_CLIENT_MEM_FRACTION=.5` to limit allocation.
 
-Finally, `PHASESPACE_EAGER=1` disables jit and dispatches every operation on its own. It is a CPU
-debugging aid and is pathologically slow on a GPU.
+`PHASESPACE_EAGER=1` disables JIT compilation and dispatches operations individually. It is
+useful for CPU debugging but very slow on a GPU.
 
 ## Random numbers
 
-Random number generation in JAX is purely functional: rather than relying on a global generator
-state, an explicit key is threaded through the computation. Every function that generates random
-numbers therefore takes a `key` argument, which can be
+JAX random number generation is functional: an explicit key passes through the computation.
+Functions that generate random numbers therefore take a `key` argument. It can be:
 
-- `None`, in which case a new key is created from OS entropy. The generation is then not
-  reproducible.
-- a number, which is used to create a key. Using the same number again results in the same output.
-- a JAX PRNG key as created by `jax.random.key`, which is used directly.
+- `None`: create a new key from OS entropy, so the generation is not reproducible.
+- An integer: create a key from that value; reusing the value reproduces the output.
+- A JAX PRNG key created by `jax.random.key`: use that key directly.
 
-Note that, unlike a stateful generator, passing the *same* key twice returns exactly the same
-events.
+Passing the same key twice returns the same events.

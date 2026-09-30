@@ -5,34 +5,34 @@
 [![PyPI](https://img.shields.io/pypi/v/phasespace-jax.svg)](https://pypi.org/project/phasespace-jax/)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 
->This repo is a fork of the original [zfit/phasespace](https://github.com/zfit/phasespace) repo.\
->Please refer to their repo for any background information or when citing in scientific publication.\
->Checkout the [License](#license-and-attribution) and [Citing](#citing) section.
+> This repository is a fork of [zfit/phasespace](https://github.com/zfit/phasespace).
+> For background information and citations in scientific publications, consult the original project.
+> See also [License and attribution](#license-and-attribution) and [Citing](#citing).
 
-## What is different
+## Differences from the upstream package
 
-This fork replaces the [TensorFlow](https://github.com/tensorflow/tensorflow) dependency with
-[JAX](https://github.com/jax-ml/jax) and makes the generation jit-compatible.
-The algorithm (GENBOD, Raubold-Lynch, CERN 68-15) are is the exact same as in the original implementation and produce bit-identical events (see [Physics Validation](#physics-validation)).
-We also left the API (and return values) and the `DecayLanguage` integration the same, so you can use `phasespace-jax` it almost as an drop-in replacement.
-Please see the [documentation](https://cirkiters.github.io/phasespace-jax/) for reference on the exact details.
-
-Now, what is different:
+This fork replaces [TensorFlow](https://github.com/tensorflow/tensorflow) with
+[JAX](https://github.com/jax-ml/jax) and supports compilation with `jax.jit`. It retains the
+GENBOD (Raubold–Lynch) algorithm described in CERN-68-15 (see
+[Physics validation](#physics-validation)). However, TensorFlow and JAX use different random
+streams, so the same integer seed does not produce bit-identical events across the two packages.
+The API, return values and `DecayLanguage` integration remain largely compatible with the
+upstream package. See the [documentation](https://cirkiters.github.io/phasespace-jax/) for details.
 
 | Aspect | [zfit/phasespace](https://github.com/zfit/phasespace) | this fork |
 |---|---|---|
 | Backend | TensorFlow | JAX |
 | Compilation | `tf.function` | `jax.jit`, with `n_events` as a static argument |
-| Random numbers | `seed=`, stateful `tf.random.Generator` | `key=`, functional JAX PRNG key
-| `n_events` | `int`, `tf.Tensor` or `tf.Variable` | Python `int`, a new value recompiles |
-| Mass functions | `f(min_mass, max_mass, n_events[, seed])`, TFP or zfit PDFs | `f(min_mass, max_mass, n_events, key)`, has to be jit-compatible |
+| Random numbers | `seed=`, stateful `tf.random.Generator` | `key=`, functional JAX PRNG key |
+| `n_events` | `int`, `tf.Tensor` or `tf.Variable` | Python `int`; a new value triggers compilation |
+| Mass functions | `f(min_mass, max_mass, n_events[, seed])`, TFP or zfit PDFs | `f(min_mass, max_mass, n_events, key)`; must be compatible with `jax.jit` |
 | Resonance shapes in `fromdecay` | zfit / zfit-physics PDFs | sampled directly in JAX, no zfit dependency |
 | Forbidden decays | `tf.errors.InvalidArgumentError` | `ValueError` |
 | `phasespace.numpy` | `tensorflow.experimental.numpy` | `jax.numpy` |
 | Distribution name | `phasespace` | `phasespace-jax`, imported as `phasespace` |
 | Speed | reference | ≈4-5x faster for 1M `B -> 3pi` events on CPU |
 
-Note that event generation won't work with 32-bit data. See the corresponding note for details [here](#jax-treats-and-traps).
+Event generation requires double precision; see [JAX treats and traps](#jax-treats-and-traps).
 
 ## Installing
 
@@ -42,14 +42,13 @@ To install with pip:
 $ pip install phasespace-jax
 ```
 
-To install the necessary dependencies to be used with
-[DecayLanguage](https://github.com/scikit-hep/decaylanguage), use
+To install the dependencies for [DecayLanguage](https://github.com/scikit-hep/decaylanguage), use:
 
 ```console
 $ pip install "phasespace-jax[fromdecay]"
 ```
 
-For GPU, check your CUDA version first and install jaxlib alongside with it, e.g.:
+For GPU use, install a JAX build compatible with your CUDA version, for example:
 
 ```console
 $ pip install "jax[cuda13]"   # SM 7.5 and newer, Turing onwards (driver >= 580)
@@ -57,15 +56,13 @@ $ pip install "jax[cuda13]"   # SM 7.5 and newer, Turing onwards (driver >= 580)
 
 ## How to use
 
-Phasespace can directly be used to generate from a DecayChain using the
-[DecayLanguage](https://github.com/scikit-hep/decaylanguage) package as
-[explained in the tutorial](https://cirkiters.github.io/phasespace-jax/GenMultiDecay_Tutorial/).
+The [DecayChain tutorial](https://cirkiters.github.io/phasespace-jax/GenMultiDecay_Tutorial/)
+shows how to generate events from a `DecayChain` using
+[DecayLanguage](https://github.com/scikit-hep/decaylanguage).
 
-The generation of simple `n`-body decays can be done using the `nbody_decay` shortcut to create a
-decay chain with a very simple interface: one needs to pass the mass of the top particle and the
-masses of the children particles as a list, optionally giving the names of the particles. Then, the
-`generate` method can be used to produce the desired sample.
-For example, to generate $B^0\to K\pi$, we would do:
+For a simple $n$-body decay, `nbody_decay` constructs the decay chain from the parent mass and a
+list of daughter masses. Particle names are optional. Then, `generate` produces the event sample.
+For example, to generate $B^0\to K\pi$:
 
 ```python
 import phasespace
@@ -79,16 +76,13 @@ weights, particles = phasespace.nbody_decay(
 ).generate(n_events=1000)
 ```
 
-The `generate` function returns a `jax.Array` of 1000 elements in the case of `weights` and a dict
-of `n particles` (2) arrays of `(1000, 4)` shape, where each of the 4 dimensions corresponds to one
-of the components of the generated Lorentz 4-vector. JAX arrays convert to numpy arrays with
-`np.asarray(...)`.
-All particles are generated in the rest frame of the top particle; boosting to a certain momentum
-(or list of momenta) can be achieved by passing the momenta to the `boost_to` argument.
+Here, `weights` is a `jax.Array` with 1000 entries. The `particles` dictionary contains one
+`(1000, 4)` array per particle; each row is a four-momentum. Use `np.asarray(...)` to convert JAX
+arrays to NumPy arrays. Events are generated in the parent rest frame. To generate them with a
+specified parent momentum, pass it through `boost_to`.
 
-Sequential decays can be handled with the `GenParticle` class (used internally by `generate`) and
-its `set_children` method. As an example, to build the $B^{0}\to K^{*}\gamma$ decay in which
-$K^*\to K\pi$, we would write:
+For sequential decays, use `GenParticle` and its `set_children` method. For example, the following
+chain describes $B^{0}\to K^{*}\gamma$ followed by $K^*\to K\pi$:
 
 ```python
 from phasespace import GenParticle
@@ -107,8 +101,8 @@ bz = GenParticle('B0', B0_MASS).set_children(kstar, gamma)
 weights, particles = bz.generate(n_events=1000)
 ```
 
-Where we have used the fact that `set_children` returns the parent particle.
-In this case, `particles` is a `dict` with the particle names as keys:
+Because `set_children` returns the parent particle, the calls can be chained. Here, `particles`
+is a dictionary keyed by particle name:
 
 ```pycon
 >>> particles
@@ -139,33 +133,33 @@ weights, particles = bz.generate(n_events=1000, key=jax.random.key(42))  # the s
 weights, particles = bz.generate(n_events=1000)                  # fresh key, not reproducible
 ```
 
-Passing the same key twice returns the very same events.
+Passing the same key twice returns the same events.
 
 ### JAX Treats and Traps
 
-The generation is JIT-compiled with `jax.jit`. The number of events is a *static* argument, so a
-call with a new `n_events` triggers a recompilation while repeated calls with the same value reuse
-the compiled function:
+Event generation is compiled with `jax.jit`. The number of events is a *static* argument: a new
+`n_events` value triggers compilation, whereas repeated calls with the same value reuse the
+compiled function:
 
 ```python
 for i in range(10):
     weights, particles = bz.generate(n_events=1000, key=i)
 ```
 
-Setting the environment variable `PHASESPACE_EAGER=1` (or calling `jax.disable_jit()`) makes
-everything run eagerly, which is useful when debugging the internals.
+Set `PHASESPACE_EAGER=1` or use `jax.disable_jit()` to run eagerly when debugging.
 
-**Notably, the phase space computation is not numerically stable in single precision.**
-We therefore enable JAX's double precision mode for the duration of the calls where it's needed, thus arrays are always `float64`.
-Importing `phasespace` does not change global JAX setting, so when you want to continue working with 64-bit values, run
+**Phase space generation requires double precision for numerical stability.**
+`generate` enables JAX's double precision mode for the duration of the call and returns `float64`
+arrays. Importing `phasespace` does not change the global JAX setting. To retain 64-bit precision
+in subsequent JAX operations, enable it for your program:
 
 ```python
 import jax
 jax.config.update("jax_enable_x64", True)
 ```
 
-or cast them explicity to 32-bit.
-**Implicit casting will raise a warning and silently truncates. You have been warned.**
+With x64 mode disabled, subsequent JAX operations may downcast the arrays to `float32` and issue
+a warning. Conversion with `np.asarray(...)` preserves their precision.
 
 ### Running on a GPU
 
@@ -181,51 +175,47 @@ with jax.default_device(jax.devices("gpu")[0]):
 ```
 
 
-Note that the generation is `float64` throughout (see [Jax Treats and Traps](#jax-treats-and-traps)).
-This means that the GPU has to support double precision which, on consumer hardware, might end up
-being slower than just running on CPU (depending on the number of events).
-Furthermore, memory might become a limitation, which is why we added a `chunk_size` argument that
-allows generating events in pieces:
+Generation uses `float64` throughout (see [JAX treats and traps](#jax-treats-and-traps)). GPU
+double precision performance varies by device and event count. Memory use can also be limiting;
+`chunk_size` divides generation into smaller batches:
 
 ```python
 weights, particles = bz.generate(n_events=10_000_000, key=42, chunk_size=1_000_000)
 ```
 
-Refer to the [documentation](https://cirkiters.github.io/phasespace-jax/usage/#running-on-a-gpu)
-for more details.
+See the [GPU documentation](https://cirkiters.github.io/phasespace-jax/usage/#running-on-a-gpu)
+for details.
 
 More examples can be found in the `tests` folder and in the
 [documentation](https://cirkiters.github.io/phasespace-jax/usage/).
 
 ## Physics validation
 
-Physics validation is performed continuously in the included tests (`tests/test_physics.py`), run
-through GitHub Actions. This validation is performed at two levels:
+The included physics tests (`tests/test_physics.py`) run through GitHub Actions. They compare:
 
-- In simple `n`-body decays, the results of `phasespace` are checked against `TGenPhaseSpace`.
-- For sequential decays, the results of `phasespace` are checked against
+- Simple $n$-body decays with `TGenPhaseSpace`.
+- Sequential decays with
   [RapidSim](https://github.com/gcowan/RapidSim/), a "fast Monte Carlo generator for simulation of
   heavy-quark hadron decays".
-  In the case of resonances, differences are expected because our tests don't include proper
-  modelling of their mass shape, as it would require the introduction of further dependencies.
-  However, the results of the comparison can be inspected visually.
+  Resonance comparisons can differ because these tests do not include the full mass-shape model
+  used by the reference generator. The comparison plots allow visual inspection.
 
-The results of all physics validation performed by the `test_physics.py` test are written in
-`tests/plots`.
+The tests write their comparison plots to `tests/plots`.
 
 ## Citing
 
-This fork does not change the physics, so please cite the original work:
+The underlying algorithm comes from the upstream package; please cite the original work:
 
 > A. Puig Navarro and J. Eschle, *phasespace: n-body phase space generation in Python*,
 > Journal of Open Source Software **4**(42), 1570 (2019), [doi:10.21105/joss.01570](https://doi.org/10.21105/joss.01570).
 
 The underlying algorithm is described in F. James, *Monte Carlo Phase Space*, CERN-68-15 (1968).
-If you additionally want to reference this fork specifically, see [CITATION.cff](CITATION.cff).
+To reference this fork specifically, see [CITATION.cff](CITATION.cff).
 
 ## License and attribution
 
-`phasespace-jax` is a derivative work of [zfit/phasespace](https://github.com/zfit/phasespace), copyright (c) 2019 zfit, and is distributed under the same [BSD-3-Clause license](LICENSE). 
+`phasespace-jax` is a derivative work of [zfit/phasespace](https://github.com/zfit/phasespace),
+copyright (c) 2019 zfit, and is distributed under the same [BSD-3-Clause license](LICENSE).
 The original copyright notice is retained in full. See [AUTHORS.md](AUTHORS.md) for the original authors.
 
 This fork is not affiliated with or endorsed by the zfit project.

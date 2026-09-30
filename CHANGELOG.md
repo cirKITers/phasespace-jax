@@ -1,64 +1,79 @@
 # Changelog
 
-Entries up to and including 1.10.0 are the history of the upstream
-[zfit/phasespace](https://github.com/zfit/phasespace) project this package was forked from.
+Entries through version 1.10.0 document the history of the upstream
+[zfit/phasespace](https://github.com/zfit/phasespace) project.
 
 ## Develop
 
 ### Major Features and Improvements
-- The generation runs on a GPU with no code change, given a CUDA-enabled `jaxlib`
+- Fixed Lorentz boosts for batches containing both stationary and moving parents. Internal boosts
+  use momentum and invariant mass directly, preserving conservation accuracy for light or
+  massless daughters. Corrected `kinematics.beta` to return speed divided by the speed of light.
+- Rotation coefficients are computed once per stage, avoiding repeated transcendental
+  evaluations in compiled CPU kernels. Paired CPU and GPU benchmarks show faster generation for
+  large batches. Precision and random key splitting are unchanged.
+- Relativistic Breit-Wigner sampling uses bounded rejection sampling when the requested interval
+  falls outside the CDF table or the table cannot resolve it. Sampling within the table remains
+  unchanged.
+- Physics validation now checks four-momentum conservation, mass shells, massless energies,
+  angular distributions and resonance tails. Reference comparisons preserve histogram bin
+  positions and account for weighted statistical uncertainties.
+- Generation runs on a GPU without code changes when a CUDA-enabled `jaxlib` is installed
   (`pip install "jax[cuda12]"` for Maxwell to Volta, `"jax[cuda13]"` from Turing on).
-  Actual speedup depends on the number of events and the device.
-  CPU and GPU results agree to a few ULP rather than bit-exactly, the PRNG itself being
-  backend-independent.
-- `generate` takes a `chunk_size` argument, which generates the events in chunks instead of all at
-  once and bounds the peak memory of the generation. Each chunk consumes its own split of `key`, so
-  a chunked run draws a different but equally reproducible sample.
-- Replaced `jnp.sort` in the generation with an explicit compare-exchange network, as the sorted
-  axis holds only `n_particles - 2` entries. XLA lowered the sort along that short axis to its
-  general sort. The generated events are bit-identical.
-- Ported the computational backend from TensorFlow to JAX. The generation is compiled with
-  `jax.jit`, which speeds up `generate` by roughly a factor 4-5 on CPU for a 1M event
-  `B -> 3pi` decay.
-- The mass functions of `phasespace.fromdecay` (`gauss`, `bw`, `relbw`) are now sampled
-  directly with JAX by inverse transform sampling instead of through zfit PDFs, which removes the
-  zfit and zfit-physics dependencies.
+  Speedup depends on event count and device. CPU and GPU results agree within a few units in the
+  last place (ULPs), although arithmetic is not bit-identical. The PRNG is backend independent.
+- `generate` accepts `chunk_size` to generate events in batches and limit peak memory
+  use. Each chunk receives a separate split of `key`, so a chunked run draws a different but
+  equally reproducible sample.
+- Replaced `jnp.sort` with an explicit compare-exchange network for the short axis of
+  `n_particles - 2` entries. XLA previously used a general sort for this axis. Generated
+  events remain bit-identical.
+- Ported the computational backend from TensorFlow to JAX. Compilation with `jax.jit` makes
+  `generate` roughly four to five times faster on CPU for one million `B -> 3pi` events.
+- The `phasespace.fromdecay` mass functions (`gauss`, `bw`, `relbw`) now sample
+  directly with JAX using inverse transform sampling. This removes the zfit and zfit-physics
+  dependencies.
 
 ### Behavioral changes
-- `generate` takes a `key` argument instead of `seed`, which is either an integer, a JAX PRNG
-  key or None. JAX random number generation is purely functional: passing the same key twice yields
-  identical events, whereas a `tf.random.Generator` advanced its state between calls.
-- `n_events` has to be a Python integer and is a static argument of the compiled function.
-  Generating with a new value of `n_events` recompiles. `tf.Variable` is no longer accepted.
-- Mass functions of resonances are called as `mass(min_mass, max_mass, n_events, key)` and have to
-  be jit-compatible. The previous signature inspection, which passed `seed` only if the function
-  declared it, has been dropped.
+- Decays at the exact threshold raise `ValueError` because their normalized weights are
+  undefined. Numerical boost corrections can change the last bits of generated momenta.
+  Generation remains reproducible for a fixed key; phase-space key splitting and weight formulas
+  are unchanged.
+- `generate` accepts `key` in place of `seed`. The value can be an integer, a JAX PRNG
+  key or `None`. JAX random generation is functional: reusing a key produces identical events,
+  whereas `tf.random.Generator` advances its state between calls.
+- `n_events` must be a Python integer and is a static argument of the compiled function.
+  A new value triggers compilation. `tf.Variable` is no longer accepted.
+- Resonance mass functions receive `mass(min_mass, max_mass, n_events, key)` and must be
+  compatible with `jax.jit`. Signature inspection that conditionally passed `seed` has been
+  removed.
 - Kinematically forbidden decays raise `ValueError` instead of
   `tf.errors.InvalidArgumentError`.
-- `generate` enables the double precision mode of JAX for the duration of the call and returns
-  `float64` arrays regardless of the caller's setting, as the computation is not numerically stable
-  in single precision. Importing `phasespace` does not change any global JAX setting. Note that
-  with x64 mode off, further *JAX* operations on the returned arrays downcast them to `float32` and
-  warn, while converting to numpy preserves them. The helpers in `phasespace.kinematics` follow the
-  precision of their caller so that they stay composable with `jax.jit`.
-- `GenMultiDecay.generate` accepts a `key` argument. Its decay mode assignment was previously
-  drawn from the global TensorFlow seed and ignored the seeding mechanism entirely.
+- `generate` enables JAX double precision for the duration of the call and returns `float64`
+  arrays, regardless of the caller's setting. Single precision is numerically unstable for this
+  computation. Importing `phasespace` leaves global JAX settings unchanged. With x64 mode
+  disabled, later JAX operations can downcast the arrays to `float32` and issue a warning;
+  conversion to NumPy preserves their precision. The helpers in `phasespace.kinematics`
+  follow the caller's precision to remain compatible with `jax.jit`.
+- `GenMultiDecay.generate` accepts a `key` argument. Previously, decay mode selection
+  used the global TensorFlow seed and ignored the supplied seed.
 - Removed the `generate_tensor`, `Particle` and `generate_decay` stubs, which only raised.
 - `phasespace.numpy` is now `jax.numpy` instead of `tensorflow.experimental.numpy`.
 
 ### Bug fixes and small changes
-- Resonance masses are now drawn from the key passed to `generate`. Previously they were drawn
-  from the global TensorFlow generator, so seeded generation of decays with resonances was not
+- Resonance masses are now drawn from the key passed to `generate`. Previously, they were
+  drawn from the global TensorFlow generator, so seeded decays with resonances were not
   reproducible.
-- `PHASESPACE_EAGER=0` now correctly means "not eager". The value was previously interpreted as a
-  non-empty string and therefore enabled eager mode as well.
+- `PHASESPACE_EAGER=0` now leaves eager mode disabled. Previously, it was interpreted as a
+  non-empty string and enabled eager mode.
 - The `fromdecay` import error no longer passes an invalid `file` keyword to
-  `ModuleNotFoundError`, which masked the intended message with a `TypeError`.
+  `ModuleNotFoundError`. That keyword previously caused a `TypeError` and obscured the
+  intended message.
 
 ### Requirement changes
 - Requires `jax >= 0.11.0`. `tensorflow` and `tensorflow_probability` are no longer required,
   and the `tf`/`tensorflow` extras were removed.
-- Requires Python >= 3.12, the floor of the jax 0.11 line. Support for 3.10 and 3.11 is dropped.
+- Requires Python >= 3.12, the minimum supported by JAX 0.11. Support for 3.10 and 3.11 is dropped.
 - The `fromdecay` extra no longer requires `zfit` and `zfit-physics`.
 
 

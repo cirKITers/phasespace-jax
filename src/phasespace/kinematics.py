@@ -121,22 +121,16 @@ def lorentz_boost(vector, boostvector):
     boost = spatial_component(boostvector)
     b2 = jnp.expand_dims(scalar_product(boost, boost), axis=-1)
 
-    def boost_fn():
-        gamma = 1.0 / jnp.sqrt(1.0 - b2)
-        gamma2 = (gamma - 1.0) / b2
-        ve = time_component(vector)
-        vp = spatial_component(vector)
-        bp = jnp.expand_dims(scalar_product(vp, boost), axis=-1)
-        vp2 = vp + (gamma2 * bp + gamma * ve) * boost
-        ve2 = gamma * (ve + bp)
-        return lorentz_vector(vp2, ve2)
-
-    # if boost vector is zero, return the original vector
-    # NOTE: both branches are always evaluated and boost_fn() divides by b2, so the discarded
-    # branch holds NaNs for a zero boost. Harmless for values, but `jax.grad` would propagate
-    # them; a double-where would be needed if gradients are ever wanted here.
-    all_b2_zero = jnp.all(jnp.equal(b2, jnp.zeros_like(b2)))
-    return jnp.where(all_b2_zero, vector, boost_fn())
+    gamma = 1.0 / jnp.sqrt(1.0 - b2)
+    # (gamma - 1) / b2 = gamma**2 / (gamma + 1), including its limit at b2 = 0.
+    # This avoids both division by zero and cancellation for small boosts.
+    gamma2 = gamma * (gamma / (gamma + 1.0))
+    ve = time_component(vector)
+    vp = spatial_component(vector)
+    bp = jnp.expand_dims(scalar_product(vp, boost), axis=-1)
+    vp2 = vp + (gamma2 * bp + gamma * ve) * boost
+    ve2 = gamma * (ve + bp)
+    return lorentz_vector(vp2, ve2)
 
 
 def beta(vector):
@@ -148,7 +142,7 @@ def beta(vector):
     Returns:
         Beta (v/c) of the Lorentz momentum vector.
     """
-    return mass(vector) / time_component(vector)
+    return jnp.sqrt(jnp.sum(jnp.square(spatial_component(vector)), axis=-1, keepdims=True)) / time_component(vector)
 
 
 def boost_components(vector):

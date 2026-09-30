@@ -95,9 +95,7 @@ def test_per_event_boost_to_is_sliced_per_chunk():
     momentum of the first chunk, which this catches.
     """
     n_events = 500
-    # every event is boosted: a batch mixing zero and non-zero boosts hits an unrelated NaN in
-    # `kinematics.lorentz_boost`, which decides on the zero-boost shortcut for the whole batch at once
-    boost_to = _boosted_along_z(np.linspace(1000.0, 20000.0, n_events))
+    boost_to = _boosted_along_z(np.linspace(0.0, 20000.0, n_events))
 
     _, parts = _decay().generate(n_events, boost_to=boost_to, key=5, chunk_size=128)
 
